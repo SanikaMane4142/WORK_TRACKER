@@ -145,8 +145,7 @@ export const upsertWorkLog = async (payload) => {
   const { data, error } = await supabase
     .from(WORK_LOG_TABLE)
     .upsert([mapped], { onConflict: dateColumn })
-    .select()
-    .maybeSingle();
+    .select();
 
   if (error) {
     const message = (error.message || "").toLowerCase();
@@ -160,37 +159,41 @@ export const upsertWorkLog = async (payload) => {
       return { data: null, error };
     }
 
-    const { data: existing, error: findError } = await supabase
+    const { data: existingRows, error: findError } = await supabase
       .from(WORK_LOG_TABLE)
       .select("id")
       .eq(dateColumn, mapped[dateColumn])
-      .maybeSingle();
+      .order("id", { ascending: false })
+      .limit(1);
 
     if (findError) return { data: null, error: findError };
 
+    const existing = Array.isArray(existingRows) ? existingRows[0] : existingRows;
+
     if (existing?.id) {
-      const { data: updated, error: updateError } = await supabase
+      const { data: updatedRows, error: updateError } = await supabase
         .from(WORK_LOG_TABLE)
         .update(mapped)
         .eq("id", existing.id)
-        .select()
-        .maybeSingle();
+        .select();
 
       if (updateError) return { data: null, error: updateError };
+      const updated = Array.isArray(updatedRows) ? updatedRows[0] : updatedRows;
       return { data: updated ? mapFromDb(updated) : null, error: null };
     }
 
-    const { data: inserted, error: insertError } = await supabase
+    const { data: insertedRows, error: insertError } = await supabase
       .from(WORK_LOG_TABLE)
       .insert([mapped])
-      .select()
-      .maybeSingle();
+      .select();
 
     if (insertError) return { data: null, error: insertError };
+    const inserted = Array.isArray(insertedRows) ? insertedRows[0] : insertedRows;
     return { data: inserted ? mapFromDb(inserted) : null, error: null };
   }
 
-  return { data: data ? mapFromDb(data) : null, error: null };
+  const row = Array.isArray(data) ? data[0] : data;
+  return { data: row ? mapFromDb(row) : null, error: null };
 };
 
 export const explainSupabaseError = formatSupabaseError;
