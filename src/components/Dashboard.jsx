@@ -6,14 +6,21 @@ import InsightTracker from "./InsightTracker.jsx";
 import NotesBoard from "./NotesBoard.jsx";
 import AnalyticsDashboard from "./AnalyticsDashboard.jsx";
 import ProjectNotes from "./ProjectNotes.jsx";
+import Expenses from "./Expenses.jsx";
 import {
   fetchAllProjectNotes,
   fetchMistakes,
   fetchNotes,
   fetchProjects,
+  fetchExpenses,
+  addExpense,
+  addTask,
+  fetchTasks,
+  updateTask,
+  upsertDailySummary,
 } from "../services/supabaseClient";
 
-const navItems = ["Overview", "Tasks", "Calendar", "AI Insights", "Notes", "Project Notes"];
+const navItems = ["Overview", "Tasks", "Calendar", "AI Insights", "Notes", "Project Notes", "Expenses"];
 
 const toolItems = [
   { label: "Time Tracker" },
@@ -97,16 +104,23 @@ const Header = ({
   onSignOut,
   searchValue,
   onSearchChange,
+  onSmartSubmit,
 }) => (
   <header className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/70 p-4 shadow-card md:flex-row md:items-center md:justify-between">
     <div className="flex flex-1 items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm">
       <span className="text-slate-400">Search</span>
       <input
         type="text"
-        placeholder="Search or type a command"
+        placeholder="Search or type a command (task, expense, repeat)"
         className="w-full bg-transparent text-sm text-slate-600 placeholder:text-slate-400 focus:outline-none"
         value={searchValue}
         onChange={(event) => onSearchChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            onSmartSubmit?.(searchValue);
+          }
+        }}
       />
       <span className="rounded-full border border-slate-200 px-2 py-1 text-xs text-slate-400">
         Cmd F
@@ -621,7 +635,11 @@ const Dashboard = ({
   const [mistakes, setMistakes] = React.useState([]);
   const [projectNotes, setProjectNotes] = React.useState([]);
   const [projects, setProjects] = React.useState([]);
+  const [expenses, setExpenses] = React.useState([]);
   const [searchError, setSearchError] = React.useState("");
+  const [showKickoff, setShowKickoff] = React.useState(true);
+  const [tasksRefreshKey, setTasksRefreshKey] = React.useState(0);
+  const [expensesRefreshKey, setExpensesRefreshKey] = React.useState(0);
   const logDateSet = React.useMemo(
     () => new Set((logs || []).map((log) => log.log_date)),
     [logs]
@@ -630,6 +648,195 @@ const Dashboard = ({
   const formatDate = (date) => date.toISOString().split("T")[0];
   const isSameDay = (a, b) => formatDate(a) === formatDate(b);
   const today = new Date();
+  const yesterday = React.useMemo(() => {
+    const date = new Date();
+    date.setDate(date.getDate() - 1);
+    return formatDate(date);
+  }, []);
+  const dailyMessage = React.useMemo(() => {
+    const key = formatDate(today);
+    const seed = key.split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+    const hour = today.getHours();
+    const timeOfDay =
+      hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening";
+    const messages = {
+      morning: [
+        "Hey Sanika, today is a fresh start 💫",
+        "You did great yesterday, let’s do even better today 🚀",
+      ],
+      afternoon: [
+        "Midday check-in, Sanika — keep the momentum going 🌤️",
+        "Halfway through the day—small wins add up ✨",
+      ],
+      evening: [
+        "Evening focus, Sanika — close strong 🌙",
+        "Wrap it up with one meaningful win tonight 🌟",
+      ],
+    };
+    const options = messages[timeOfDay];
+    return options[seed % options.length];
+  }, [today]);
+
+  const todayKey = formatDate(today);
+  const todaysSummary = React.useMemo(() => {
+    const tasksCompleted = (tasks || []).filter(
+      (task) => task.status === "done" && task.date === todayKey
+    ).length;
+    const log = (logs || []).find((entry) => entry.log_date === todayKey);
+    const timeSpentMinutes = log?.hours ? Math.round(Number(log.hours) * 60) : 0;
+    const moneySpent = (expenses || [])
+      .filter((expense) => expense.expense_date === todayKey)
+      .reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
+    return {
+      tasksCompleted,
+      timeSpentMinutes,
+      moneySpent,
+    };
+  }, [tasks, logs, expenses, todayKey]);
+
+  React.useEffect(() => {
+    const saveSummary = async () => {
+      await upsertDailySummary({
+        summary_date: todayKey,
+        tasks_completed: todaysSummary.tasksCompleted,
+        time_spent_minutes: todaysSummary.timeSpentMinutes,
+        money_spent: todaysSummary.moneySpent,
+      });
+    };
+    saveSummary();
+  }, [todayKey, todaysSummary]);
+  const processingRecurringRef = React.useRef(false);
+
+  const computeNextDue = (baseDate, recurrence) => {
+    const next = new Date(baseDate);
+    if (recurrence === "daily") next.setDate(next.getDate() + 1);
+    if (recurrence === "weekly") next.setDate(next.getDate() + 7);
+    if (recurrence === "monthly") next.setMonth(next.getMonth() + 1);
+    return next.toISOString().split("T")[0];
+  };
+
+  const refreshTasks = async () => {
+    const { data } = await fetchTasks();
+    if (data) onTasksUpdate?.(data);
+    setTasksRefreshKey((prev) => prev + 1);
+  };
+
+  const refreshExpenses = async () => {
+    setExpensesRefreshKey((prev) => prev + 1);
+  };
+
+  const handleSmartSubmit = async (rawValue) => {
+    const value = String(rawValue || "").trim();
+    if (!value) return;
+
+    const lower = value.toLowerCase();
+
+    const parseCategory = (text) => {
+      const match = text.match(/^(work|personal|home)\\s*[:\\-]?\\s*(.*)$/i);
+      if (match) return { category: match[1].toLowerCase(), rest: match[2] };
+      return { category: "work", rest: text };
+    };
+
+    if (lower.startsWith("expense")) {
+      const match = value.match(/^expense\\s+([\\d.]+)\\s*(.*)$/i);
+      if (!match) return;
+      const amount = Number(match[1]);
+      const remainder = (match[2] || "").trim();
+      const [category, ...noteParts] = remainder.split(" ");
+      const note = noteParts.join(" ").trim();
+      if (!Number.isFinite(amount)) return;
+      await addExpense({
+        amount,
+        category: category || "general",
+        note,
+        expense_date: formatDate(today),
+      });
+      await refreshExpenses();
+      setSearchQuery("");
+      return;
+    }
+
+    if (lower.startsWith("repeat")) {
+      const match = value.match(/^repeat\\s+(daily|weekly|monthly)\\s*(.*)$/i);
+      if (!match) return;
+      const recurrence = match[1].toLowerCase();
+      const remainder = match[2] || "";
+      const { category, rest } = parseCategory(remainder);
+      const title = rest.replace(/^[:\\-\\s]+/, "").trim();
+      if (!title) return;
+      const todayKey = formatDate(today);
+      await addTask({
+        title,
+        description: "",
+        status: "open",
+        date: todayKey,
+        priority: false,
+        category,
+        recurrence,
+        next_due: computeNextDue(today, recurrence),
+      });
+      await refreshTasks();
+      setSearchQuery("");
+      return;
+    }
+
+    if (lower.startsWith("task")) {
+      const remainder = value.replace(/^task\\s*/i, "").trim();
+      const { category, rest } = parseCategory(remainder);
+      const title = rest.replace(/^[:\\-\\s]+/, "").trim();
+      if (!title) return;
+      await addTask({
+        title,
+        description: "",
+        status: "open",
+        date: formatDate(today),
+        priority: false,
+        category,
+      });
+      await refreshTasks();
+      setSearchQuery("");
+      return;
+    }
+  };
+
+  React.useEffect(() => {
+    const processRecurringTasks = async () => {
+      if (processingRecurringRef.current) return;
+      processingRecurringRef.current = true;
+      const todayKey = formatDate(today);
+      for (const task of tasks || []) {
+        if (!task.recurrence) continue;
+        const hasNext = Boolean(task.next_due);
+        if (!hasNext) {
+          await updateTask(task.id, {
+            next_due: computeNextDue(today, task.recurrence),
+          });
+          continue;
+        }
+        if (task.next_due > todayKey) continue;
+
+        await addTask({
+          title: task.title,
+          description: task.description || "",
+          status: "open",
+          date: todayKey,
+          priority: Boolean(task.priority),
+          category: task.category || "work",
+          recurrence: null,
+        });
+
+        await updateTask(task.id, {
+          next_due: computeNextDue(new Date(task.next_due), task.recurrence),
+        });
+      }
+      processingRecurringRef.current = false;
+      await refreshTasks();
+    };
+
+    if (tasks && tasks.length > 0) {
+      processRecurringTasks();
+    }
+  }, [tasks]);
 
   const getCalendarDays = (monthDate) => {
     const year = monthDate.getFullYear();
@@ -660,17 +867,20 @@ const Dashboard = ({
 
   React.useEffect(() => {
     const loadSearchData = async () => {
-      const [notesResult, mistakesResult, projectNotesResult, projectsResult] = await Promise.all([
-        fetchNotes(),
-        fetchMistakes(),
-        fetchAllProjectNotes(),
-        fetchProjects(),
-      ]);
+      const [notesResult, mistakesResult, projectNotesResult, projectsResult, expensesResult] =
+        await Promise.all([
+          fetchNotes(),
+          fetchMistakes(),
+          fetchAllProjectNotes(),
+          fetchProjects(),
+          fetchExpenses(),
+        ]);
       if (
         notesResult.error ||
         mistakesResult.error ||
         projectNotesResult.error ||
-        projectsResult.error
+        projectsResult.error ||
+        expensesResult.error
       ) {
         setSearchError("Some search results could not be loaded from Supabase.");
       }
@@ -678,9 +888,10 @@ const Dashboard = ({
       setMistakes(mistakesResult.data || []);
       setProjectNotes(projectNotesResult.data || []);
       setProjects(projectsResult.data || []);
+      setExpenses(expensesResult.data || []);
     };
     loadSearchData();
-  }, []);
+  }, [expensesRefreshKey]);
 
   React.useEffect(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -716,6 +927,14 @@ const Dashboard = ({
       "Project Notes": projectNotes.filter((note) =>
         [note.title, note.content, note.changed_files, note.created_at].some(matches)
       ).length,
+      Expenses: expenses.filter((expense) =>
+        [
+          expense.amount,
+          expense.category,
+          expense.note,
+          expense.expense_date,
+        ].some(matches)
+      ).length,
       "AI Insights": mistakes.filter((mistake) =>
         [
           mistake.problem,
@@ -747,7 +966,17 @@ const Dashboard = ({
     if (best.count > 0 && best.section !== activeNav) {
       setActiveNav(best.section);
     }
-  }, [searchQuery, tasks, logs, notes, projectNotes, mistakes, meetings, activeNav]);
+  }, [
+    searchQuery,
+    tasks,
+    logs,
+    notes,
+    projectNotes,
+    mistakes,
+    meetings,
+    expenses,
+    activeNav,
+  ]);
 
   const handleAddMeeting = (meeting) => {
     setMeetings((prev) => [meeting, ...prev]);
@@ -758,6 +987,35 @@ const Dashboard = ({
       <section className="rounded-2xl border border-slate-200 bg-white/80 p-6 shadow-card">
         <p className="text-3xl font-semibold text-slate-900">Hello, Sanika!</p>
         <p className="text-sm text-slate-500">Here's your weekly overview</p>
+        <p className="mt-2 text-sm text-slate-600">{dailyMessage}</p>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <div className="card p-5">
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+            Tasks completed
+          </p>
+          <p className="mt-3 text-2xl font-semibold text-slate-900">
+            {todaysSummary.tasksCompleted}
+          </p>
+        </div>
+        <div className="card p-5">
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+            Time spent
+          </p>
+          <p className="mt-3 text-2xl font-semibold text-slate-900">
+            {Math.floor(todaysSummary.timeSpentMinutes / 60)}h{" "}
+            {todaysSummary.timeSpentMinutes % 60}m
+          </p>
+        </div>
+        <div className="card p-5">
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+            Money spent
+          </p>
+          <p className="mt-3 text-2xl font-semibold text-slate-900">
+            ₹{todaysSummary.moneySpent.toFixed(2)}
+          </p>
+        </div>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[2fr_1fr]">
@@ -788,7 +1046,11 @@ const Dashboard = ({
 
   const renderProjects = () => (
     <section className="space-y-6">
-      <TaskList onTasksUpdate={onTasksUpdate} searchQuery={searchQuery} />
+      <TaskList
+        onTasksUpdate={onTasksUpdate}
+        searchQuery={searchQuery}
+        refreshKey={tasksRefreshKey}
+      />
     </section>
   );
 
@@ -914,6 +1176,12 @@ const Dashboard = ({
     </section>
   );
 
+  const renderExpenses = () => (
+    <section className="space-y-6">
+      <Expenses refreshKey={expensesRefreshKey} />
+    </section>
+  );
+
   const renderMeetings = () => (
     <MeetingsPage
       meetings={meetings}
@@ -967,6 +1235,14 @@ const Dashboard = ({
     const projectNoteResults = projectNotes.filter((note) =>
       [note.title, note.content, note.changed_files, note.created_at].some(matches)
     );
+    const expenseResults = expenses.filter((expense) =>
+      [
+        expense.amount,
+        expense.category,
+        expense.note,
+        expense.expense_date,
+      ].some(matches)
+    );
     const mistakeResults = mistakes.filter((mistake) =>
       [
         mistake.problem,
@@ -991,6 +1267,7 @@ const Dashboard = ({
       logResults.length +
       noteResults.length +
       projectNoteResults.length +
+      expenseResults.length +
       mistakeResults.length +
       meetingResults.length;
 
@@ -1024,7 +1301,7 @@ const Dashboard = ({
                   <p className="text-xs text-slate-500">{task.description}</p>
                 )}
                 <p className="text-xs text-slate-400">
-                  {task.date} · {task.status}
+                  {task.date} - {task.status}
                 </p>
               </div>
             ))}
@@ -1067,6 +1344,29 @@ const Dashboard = ({
           </div>
 
           <div className="card p-6 space-y-3">
+            <h3 className="text-sm font-semibold text-slate-700">Expenses</h3>
+            {expenseResults.length === 0 && (
+              <p className="text-sm text-slate-400">No expense matches.</p>
+            )}
+            {expenseResults.map((expense) => (
+              <div
+                key={expense.id}
+                className="rounded-2xl border border-slate-200 bg-white/80 p-4"
+              >
+                <p className="text-sm font-semibold text-slate-700">
+                  ₹{Number(expense.amount || 0).toFixed(2)}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {expense.category || "general"} - {expense.expense_date}
+                </p>
+                {expense.note && (
+                  <p className="text-xs text-slate-500">{expense.note}</p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="card p-6 space-y-3">
             <h3 className="text-sm font-semibold text-slate-700">Daily Logs</h3>
             {logResults.length === 0 && (
               <p className="text-sm text-slate-400">No log matches.</p>
@@ -1078,7 +1378,7 @@ const Dashboard = ({
               >
                 <p className="text-sm font-semibold text-slate-700">{log.log_date}</p>
                 <p className="text-xs text-slate-500">
-                  Hours {log.hours || "-"} · Rating {log.rating || "-"}
+                  Hours {log.hours || "-"} - Rating {log.rating || "-"}
                 </p>
                 <p className="text-xs text-slate-500 line-clamp-2">
                   {log.notes || log.insights || log.tasks_completed || "Log entry"}
@@ -1120,7 +1420,7 @@ const Dashboard = ({
                     {meeting.title}
                   </p>
                   <p className="text-xs text-slate-500">
-                    {meeting.time} · {meeting.tag}
+                    {meeting.time} - {meeting.tag}
                   </p>
                   <p className="text-xs text-slate-500 line-clamp-2">
                     {meeting.notes || "No notes"}
@@ -1149,6 +1449,8 @@ const Dashboard = ({
         return renderNotes();
       case "Project Notes":
         return renderProjectNotes();
+      case "Expenses":
+        return renderExpenses();
       case "Meetings":
         return renderMeetings();
       case "Time Tracker":
@@ -1162,6 +1464,99 @@ const Dashboard = ({
 
   return (
     <div className="min-h-screen px-5 py-8 lg:px-10">
+      {showKickoff && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 px-4">
+          <div className="w-full max-w-3xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="section-title">Start Your Day</h2>
+                <p className="text-sm text-slate-500">
+                  Start your day with these 3 tasks.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-500">
+                  {formatDate(today)}
+                </span>
+                <button
+                  onClick={() => setShowKickoff(false)}
+                  className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500 transition hover:border-slate-300"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+            {(() => {
+              const todayKey = formatDate(today);
+              const todaysTasks = tasks.filter(
+                (task) => task.date === todayKey && task.status !== "done"
+              );
+              const pendingYesterday = tasks.filter(
+                (task) => task.date === yesterday && task.status !== "done"
+              );
+              const suggested = [
+                ...todaysTasks.filter((task) => task.priority),
+                ...todaysTasks.filter((task) => !task.priority),
+              ].slice(0, 3);
+
+              return (
+                <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                      Today's tasks
+                    </p>
+                    <div className="mt-3 space-y-2 text-sm text-slate-600">
+                      {todaysTasks.length === 0 && (
+                        <p className="text-slate-400">No tasks for today.</p>
+                      )}
+                      {todaysTasks.slice(0, 4).map((task) => (
+                        <p key={task.id}>
+                          {task.title}
+                          {task.priority && (
+                            <span className="ml-2 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] text-sky-600">
+                              Priority
+                            </span>
+                          )}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                      Pending from yesterday
+                    </p>
+                    <div className="mt-3 space-y-2 text-sm text-slate-600">
+                      {pendingYesterday.length === 0 && (
+                        <p className="text-slate-400">Nothing pending from yesterday.</p>
+                      )}
+                      {pendingYesterday.slice(0, 4).map((task) => (
+                        <p key={task.id}>{task.title}</p>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                      Suggested priorities
+                    </p>
+                    <div className="mt-3 space-y-2 text-sm text-slate-600">
+                      {suggested.length === 0 && (
+                        <p className="text-slate-400">Add tasks to get suggestions.</p>
+                      )}
+                      {suggested.map((task) => (
+                        <p key={task.id}>{task.title}</p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
         <Sidebar
           activeNav={activeNav}
@@ -1178,6 +1573,7 @@ const Dashboard = ({
             onSignOut={onSignOut}
             searchValue={searchQuery}
             onSearchChange={setSearchQuery}
+            onSmartSubmit={handleSmartSubmit}
           />
           {renderSection()}
         </main>

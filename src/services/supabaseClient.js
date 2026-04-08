@@ -117,6 +117,32 @@ export const updateTask = (id, updates) =>
 export const deleteTask = (id) =>
   supabase.from("tasks").delete().eq("id", id);
 
+export const fetchExpenses = ({ from, to } = {}) => {
+  let query = supabase.from("expenses").select("*").order("expense_date", {
+    ascending: false,
+  });
+  if (from) query = query.gte("expense_date", from);
+  if (to) query = query.lte("expense_date", to);
+  return query;
+};
+
+export const addExpense = (payload) => supabase.from("expenses").insert([payload]);
+
+export const deleteExpense = (id) =>
+  supabase.from("expenses").delete().eq("id", id);
+
+export const fetchDailySummary = (date) =>
+  supabase
+    .from("daily_summaries")
+    .select("*")
+    .eq("summary_date", date)
+    .maybeSingle();
+
+export const upsertDailySummary = (payload) =>
+  supabase
+    .from("daily_summaries")
+    .upsert([payload], { onConflict: "summary_date" });
+
 export const fetchWorkLogs = async ({ from, to } = {}) => {
   const { error: configError } = ensureConfigured();
   if (configError) return { data: null, error: configError };
