@@ -36,6 +36,7 @@ const WorkLog = ({
   onLogsUpdate,
   selectedDate,
   onDateChange,
+  searchQuery = "",
 }) => {
   const [form, setForm] = useState({
     log_date: todayString(),
@@ -267,6 +268,30 @@ const WorkLog = ({
 
   const expandedByDefault = useMemo(() => new Set([form.log_date]), [form.log_date]);
 
+  const filteredLogs = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return logs;
+    return logs.filter((log) => {
+      const haystack = [
+        log.log_date,
+        log.hours,
+        log.tasks_planned,
+        log.tasks_completed,
+        log.wip,
+        log.blockers,
+        log.learnings,
+        log.insights,
+        log.rating,
+        log.tomorrow,
+        log.notes,
+      ]
+        .filter((value) => value !== null && value !== undefined)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [logs, searchQuery]);
+
   return (
     <section className="card p-6 md:p-8 space-y-6 animate-floatIn">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -442,10 +467,10 @@ const WorkLog = ({
 
       <div className="space-y-4">
         <h3 className="font-display text-lg">History</h3>
-        {logs.length === 0 && (
+        {filteredLogs.length === 0 && (
           <p className="text-sm text-white/60">No logs yet.</p>
         )}
-        {logs.map((log, index) => {
+        {filteredLogs.map((log, index) => {
           const openByDefault = expandedByDefault.has(log.log_date);
           return (
             <details

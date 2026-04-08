@@ -3,7 +3,7 @@ import { addMistake, deleteMistake, fetchMistakes } from "../services/supabaseCl
 
 const normalize = (value) => value.trim().toLowerCase();
 
-const MistakeLog = () => {
+const MistakeLog = ({ searchQuery = "" }) => {
   const [form, setForm] = useState({
     problem: "",
     cause: "",
@@ -63,6 +63,24 @@ const MistakeLog = () => {
     return counts;
   }, [mistakes]);
 
+  const filteredMistakes = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return mistakes;
+    return mistakes.filter((mistake) => {
+      const haystack = [
+        mistake.problem,
+        mistake.cause,
+        mistake.solution,
+        mistake.learning,
+        mistake.created_at,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [mistakes, searchQuery]);
+
   return (
     <section className="card p-6 md:p-8 space-y-6 animate-floatIn">
       <div>
@@ -103,10 +121,10 @@ const MistakeLog = () => {
       {error && <p className="text-sm text-rose-300">{error}</p>}
 
       <div className="space-y-3">
-        {mistakes.length === 0 && (
+        {filteredMistakes.length === 0 && (
           <p className="text-sm text-white/60">No mistakes logged yet.</p>
         )}
-        {mistakes.map((mistake) => {
+        {filteredMistakes.map((mistake) => {
           const repeats = repeatCounts[normalize(mistake.problem || "")] || 0;
           return (
             <div
@@ -117,7 +135,7 @@ const MistakeLog = () => {
                 <h3 className="font-display text-lg">{mistake.problem}</h3>
                 {repeats > 1 && (
                   <span className="rounded-full bg-rose-500/20 px-3 py-1 text-xs text-rose-200">
-                    Repeat issue · {repeats}x
+                    Repeat issue Â· {repeats}x
                   </span>
                 )}
               </div>

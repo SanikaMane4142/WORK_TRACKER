@@ -3,22 +3,31 @@ import TaskList from "./TaskList.jsx";
 import WorkLog from "./WorkLog.jsx";
 import MistakeLog from "./MistakeLog.jsx";
 import InsightTracker from "./InsightTracker.jsx";
+import NotesBoard from "./NotesBoard.jsx";
+import AnalyticsDashboard from "./AnalyticsDashboard.jsx";
+import ProjectNotes from "./ProjectNotes.jsx";
+import {
+  fetchAllProjectNotes,
+  fetchMistakes,
+  fetchNotes,
+  fetchProjects,
+} from "../services/supabaseClient";
 
-const navItems = ["Overview", "Projects", "Calendar", "AI Insights"];
+const navItems = ["Overview", "Tasks", "Calendar", "AI Insights", "Notes", "Project Notes"];
 
 const toolItems = [
   { label: "Time Tracker" },
   { label: "Analytics" },
 ];
 
-const Sidebar = ({ activeNav, onNavigate }) => (
+const Sidebar = ({ activeNav, onNavigate, onLogout }) => (
   <aside className="flex h-full flex-col gap-6 rounded-2xl border border-slate-200 bg-white/80 p-6 shadow-card">
     <div className="flex items-center gap-3">
       <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-500 text-white shadow-glow">
-        <span className="text-lg font-semibold">E</span>
+        <span className="text-lg font-semibold">S</span>
       </div>
       <div>
-        <p className="text-sm font-semibold text-slate-900">Equa</p>
+        <p className="text-sm font-semibold text-slate-900">Sanika</p>
         <p className="text-xs text-slate-400">SaaS Console</p>
       </div>
     </div>
@@ -68,7 +77,10 @@ const Sidebar = ({ activeNav, onNavigate }) => (
     </div>
 
     <div className="mt-auto">
-      <button className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-500 transition hover:bg-slate-50">
+      <button
+        onClick={onLogout}
+        className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-500 transition hover:bg-slate-50"
+      >
         <span className="h-2 w-2 rounded-full bg-slate-300" />
         Logout
       </button>
@@ -76,7 +88,16 @@ const Sidebar = ({ activeNav, onNavigate }) => (
   </aside>
 );
 
-const Header = ({ session, email, authStatus, onEmailChange, onSignIn, onSignOut }) => (
+const Header = ({
+  session,
+  email,
+  authStatus,
+  onEmailChange,
+  onSignIn,
+  onSignOut,
+  searchValue,
+  onSearchChange,
+}) => (
   <header className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/70 p-4 shadow-card md:flex-row md:items-center md:justify-between">
     <div className="flex flex-1 items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm">
       <span className="text-slate-400">Search</span>
@@ -84,6 +105,8 @@ const Header = ({ session, email, authStatus, onEmailChange, onSignIn, onSignOut
         type="text"
         placeholder="Search or type a command"
         className="w-full bg-transparent text-sm text-slate-600 placeholder:text-slate-400 focus:outline-none"
+        value={searchValue}
+        onChange={(event) => onSearchChange(event.target.value)}
       />
       <span className="rounded-full border border-slate-200 px-2 py-1 text-xs text-slate-400">
         Cmd F
@@ -253,55 +276,129 @@ const ProductivityTrends = ({ weeklyFocus }) => {
   );
 };
 
-const TimeTracker = () => (
-  <div className="rounded-2xl bg-slate-900 p-6 text-white shadow-lg">
-    <div className="flex items-center justify-between">
-      <p className="text-sm font-semibold text-white/80">Time Tracker</p>
-      <div className="flex items-center gap-2">
-        <button className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-xs">
-          ||
-        </button>
-        <button className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-500 text-xs">
-          &gt;
-        </button>
-      </div>
-    </div>
-    <div className="mt-6 flex items-center justify-center">
-      <div className="relative h-44 w-44">
-        <svg className="h-full w-full -rotate-90">
-          <circle
-            cx="88"
-            cy="88"
-            r="70"
-            stroke="rgba(255,255,255,0.1)"
-            strokeWidth="14"
-            fill="none"
-          />
-          <circle
-            cx="88"
-            cy="88"
-            r="70"
-            stroke="url(#timerGradient)"
-            strokeWidth="14"
-            strokeLinecap="round"
-            fill="none"
-            strokeDasharray="330 440"
-          />
-          <defs>
-            <linearGradient id="timerGradient" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#f97316" />
-              <stop offset="100%" stopColor="#facc15" />
-            </linearGradient>
-          </defs>
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          <p className="text-3xl font-semibold">40:38</p>
-          <p className="text-xs text-white/60">Current session</p>
+const TimeTracker = () => {
+  const [isRunning, setIsRunning] = React.useState(false);
+  const [seconds, setSeconds] = React.useState(0);
+  const [sessions, setSessions] = React.useState([]);
+  const tickRef = React.useRef(null);
+  const targetMinutes = 50;
+  const targetSeconds = targetMinutes * 60;
+
+  React.useEffect(() => {
+    if (!isRunning) return;
+    tickRef.current = setInterval(() => {
+      setSeconds((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(tickRef.current);
+  }, [isRunning]);
+
+  const formatTime = (value) => {
+    const mins = Math.floor(value / 60);
+    const secs = value % 60;
+    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  };
+
+  const toggleRun = () => setIsRunning((prev) => !prev);
+
+  const handleReset = () => {
+    if (seconds > 0) {
+      const entry = {
+        id: `${Date.now()}`,
+        duration: seconds,
+        endedAt: new Date().toISOString(),
+      };
+      setSessions((prev) => [entry, ...prev].slice(0, 5));
+    }
+    setSeconds(0);
+    setIsRunning(false);
+  };
+
+  const progress = Math.min(seconds / targetSeconds, 1);
+  const dash = `${(2 * Math.PI * 70 * progress).toFixed(0)} ${(2 * Math.PI * 70).toFixed(0)}`;
+
+  return (
+    <div className="rounded-2xl bg-sky-50 p-6 text-slate-900 shadow-lg">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-slate-800">Time Tracker</p>
+          <p className="text-xs text-slate-500">
+            {targetMinutes} min focus target
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleReset}
+            className="flex h-9 items-center justify-center rounded-full border border-slate-200 px-4 text-xs text-slate-600 transition hover:border-slate-300"
+          >
+            Reset
+          </button>
+          <button
+            onClick={toggleRun}
+            className="flex h-9 items-center justify-center rounded-full bg-sky-500 px-4 text-xs font-semibold text-white shadow-glow transition hover:brightness-110"
+          >
+            {isRunning ? "Pause" : "Start"}
+          </button>
         </div>
       </div>
+      <div className="mt-6 flex items-center justify-center">
+        <div className="relative h-44 w-44">
+          <svg className="h-full w-full -rotate-90">
+            <circle
+              cx="88"
+              cy="88"
+              r="70"
+              stroke="rgba(148,163,184,0.35)"
+              strokeWidth="14"
+              fill="none"
+            />
+            <circle
+              cx="88"
+              cy="88"
+              r="70"
+              stroke="url(#timerGradient)"
+              strokeWidth="14"
+              strokeLinecap="round"
+              fill="none"
+              strokeDasharray={dash}
+            />
+            <defs>
+              <linearGradient id="timerGradient" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#38bdf8" />
+                <stop offset="100%" stopColor="#0ea5e9" />
+              </linearGradient>
+            </defs>
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+            <p className="text-3xl font-semibold text-slate-900">{formatTime(seconds)}</p>
+            <p className="text-xs text-slate-500">
+              {isRunning ? "Focusing" : "Paused"}
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="mt-6 space-y-2">
+        <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Recent sessions</p>
+        {sessions.length === 0 && (
+          <p className="text-xs text-slate-500">No sessions yet.</p>
+        )}
+        {sessions.map((session) => (
+          <div
+            key={session.id}
+            className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs text-slate-600"
+          >
+            <span>{formatTime(session.duration)}</span>
+            <span>
+              {new Date(session.endedAt).toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const ReminderCard = ({ nextMeeting, onOpenMeetings }) => (
   <div className="card p-5">
@@ -366,7 +463,7 @@ const InsightCard = () => (
   </div>
 );
 
-const MeetingsPage = ({ meetings, onAddMeeting }) => {
+const MeetingsPage = ({ meetings, onAddMeeting, searchQuery = "" }) => {
   const [form, setForm] = React.useState({
     title: "",
     time: "",
@@ -392,16 +489,34 @@ const MeetingsPage = ({ meetings, onAddMeeting }) => {
     setForm({ title: "", time: "", tag: "Work", notes: "" });
   };
 
+  const filteredMeetings = React.useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return meetings;
+    return meetings.filter((meeting) => {
+      const haystack = [
+        meeting.title,
+        meeting.time,
+        meeting.tag,
+        meeting.notes,
+        meeting.created_at,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [meetings, searchQuery]);
+
   return (
     <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
       <div className="card p-6">
         <h2 className="text-lg font-semibold text-slate-800">Meetings</h2>
         <p className="text-sm text-slate-500">Upcoming meetings and notes.</p>
         <div className="mt-5 space-y-3">
-          {meetings.length === 0 && (
+          {filteredMeetings.length === 0 && (
             <p className="text-sm text-slate-400">No meetings yet.</p>
           )}
-          {meetings.map((meeting) => (
+          {filteredMeetings.map((meeting) => (
             <div
               key={meeting.id}
               className="rounded-2xl border border-slate-200 bg-white/80 p-4"
@@ -474,6 +589,7 @@ const Dashboard = ({
   onEmailChange,
   onSignIn,
   onSignOut,
+  onLocalSignOut,
   stats,
   weeklyFocus,
   filterFrom,
@@ -486,6 +602,7 @@ const Dashboard = ({
   onLogsUpdate,
 }) => {
   const [activeNav, setActiveNav] = React.useState("Overview");
+  const [searchQuery, setSearchQuery] = React.useState("");
   const [selectedDate, setSelectedDate] = React.useState(
     new Date().toISOString().split("T")[0]
   );
@@ -500,6 +617,11 @@ const Dashboard = ({
       return [];
     }
   });
+  const [notes, setNotes] = React.useState([]);
+  const [mistakes, setMistakes] = React.useState([]);
+  const [projectNotes, setProjectNotes] = React.useState([]);
+  const [projects, setProjects] = React.useState([]);
+  const [searchError, setSearchError] = React.useState("");
   const logDateSet = React.useMemo(
     () => new Set((logs || []).map((log) => log.log_date)),
     [logs]
@@ -536,6 +658,97 @@ const Dashboard = ({
     localStorage.setItem("meetings", JSON.stringify(meetings));
   }, [meetings]);
 
+  React.useEffect(() => {
+    const loadSearchData = async () => {
+      const [notesResult, mistakesResult, projectNotesResult, projectsResult] = await Promise.all([
+        fetchNotes(),
+        fetchMistakes(),
+        fetchAllProjectNotes(),
+        fetchProjects(),
+      ]);
+      if (
+        notesResult.error ||
+        mistakesResult.error ||
+        projectNotesResult.error ||
+        projectsResult.error
+      ) {
+        setSearchError("Some search results could not be loaded from Supabase.");
+      }
+      setNotes(notesResult.data || []);
+      setMistakes(mistakesResult.data || []);
+      setProjectNotes(projectNotesResult.data || []);
+      setProjects(projectsResult.data || []);
+    };
+    loadSearchData();
+  }, []);
+
+  React.useEffect(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return;
+
+    const matches = (value) =>
+      String(value || "")
+        .toLowerCase()
+        .includes(query);
+
+    const counts = {
+      Tasks: tasks.filter((task) =>
+        [task.title, task.description, task.date, task.status].some(matches)
+      ).length,
+      Calendar: logs.filter((log) =>
+        [
+          log.log_date,
+          log.hours,
+          log.tasks_planned,
+          log.tasks_completed,
+          log.wip,
+          log.blockers,
+          log.learnings,
+          log.insights,
+          log.rating,
+          log.tomorrow,
+          log.notes,
+        ].some(matches)
+      ).length,
+      Notes: notes.filter((note) =>
+        [note.title, note.content, note.created_at].some(matches)
+      ).length,
+      "Project Notes": projectNotes.filter((note) =>
+        [note.title, note.content, note.changed_files, note.created_at].some(matches)
+      ).length,
+      "AI Insights": mistakes.filter((mistake) =>
+        [
+          mistake.problem,
+          mistake.cause,
+          mistake.solution,
+          mistake.learning,
+          mistake.created_at,
+        ].some(matches)
+      ).length,
+      Meetings: meetings.filter((meeting) =>
+        [
+          meeting.title,
+          meeting.time,
+          meeting.tag,
+          meeting.notes,
+          meeting.created_at,
+        ].some(matches)
+      ).length,
+    };
+
+    const best = Object.entries(counts).reduce(
+      (acc, [section, count]) => {
+        if (count > acc.count) return { section, count };
+        return acc;
+      },
+      { section: activeNav, count: counts[activeNav] ?? 0 }
+    );
+
+    if (best.count > 0 && best.section !== activeNav) {
+      setActiveNav(best.section);
+    }
+  }, [searchQuery, tasks, logs, notes, projectNotes, mistakes, meetings, activeNav]);
+
   const handleAddMeeting = (meeting) => {
     setMeetings((prev) => [meeting, ...prev]);
   };
@@ -543,7 +756,7 @@ const Dashboard = ({
   const renderOverview = () => (
     <>
       <section className="rounded-2xl border border-slate-200 bg-white/80 p-6 shadow-card">
-        <p className="text-3xl font-semibold text-slate-900">Hello, Alex!</p>
+        <p className="text-3xl font-semibold text-slate-900">Hello, Sanika!</p>
         <p className="text-sm text-slate-500">Here's your weekly overview</p>
       </section>
 
@@ -575,7 +788,7 @@ const Dashboard = ({
 
   const renderProjects = () => (
     <section className="space-y-6">
-      <TaskList onTasksUpdate={onTasksUpdate} />
+      <TaskList onTasksUpdate={onTasksUpdate} searchQuery={searchQuery} />
     </section>
   );
 
@@ -675,6 +888,7 @@ const Dashboard = ({
             onLogsUpdate={onLogsUpdate}
             selectedDate={selectedDate}
             onDateChange={setSelectedDate}
+            searchQuery={searchQuery}
           />
         </div>
       </div>
@@ -684,12 +898,28 @@ const Dashboard = ({
   const renderInsights = () => (
     <section className="space-y-6">
       <InsightTracker tasks={tasks} onSaved={() => {}} />
-      <MistakeLog />
+      <MistakeLog searchQuery={searchQuery} />
+    </section>
+  );
+
+  const renderNotes = () => (
+    <section className="space-y-6">
+      <NotesBoard searchQuery={searchQuery} />
+    </section>
+  );
+
+  const renderProjectNotes = () => (
+    <section className="space-y-6">
+      <ProjectNotes />
     </section>
   );
 
   const renderMeetings = () => (
-    <MeetingsPage meetings={meetings} onAddMeeting={handleAddMeeting} />
+    <MeetingsPage
+      meetings={meetings}
+      onAddMeeting={handleAddMeeting}
+      searchQuery={searchQuery}
+    />
   );
 
   const renderTimeTracker = () => (
@@ -703,20 +933,222 @@ const Dashboard = ({
   );
 
   const renderAnalytics = () => (
-    <section className="grid gap-6 lg:grid-cols-[1.4fr_0.6fr]">
-      <ProductivityTrends weeklyFocus={weeklyFocus} />
-      <DonutChart />
-    </section>
+    <AnalyticsDashboard tasks={tasks} logs={logs} />
   );
 
+  const renderSearchResults = () => {
+    const query = searchQuery.trim().toLowerCase();
+    const matches = (value) =>
+      String(value || "")
+        .toLowerCase()
+        .includes(query);
+
+    const taskResults = tasks.filter((task) =>
+      [task.title, task.description, task.date, task.status].some(matches)
+    );
+    const logResults = logs.filter((log) =>
+      [
+        log.log_date,
+        log.hours,
+        log.tasks_planned,
+        log.tasks_completed,
+        log.wip,
+        log.blockers,
+        log.learnings,
+        log.insights,
+        log.rating,
+        log.tomorrow,
+        log.notes,
+      ].some(matches)
+    );
+    const noteResults = notes.filter((note) =>
+      [note.title, note.content, note.created_at].some(matches)
+    );
+    const projectNoteResults = projectNotes.filter((note) =>
+      [note.title, note.content, note.changed_files, note.created_at].some(matches)
+    );
+    const mistakeResults = mistakes.filter((mistake) =>
+      [
+        mistake.problem,
+        mistake.cause,
+        mistake.solution,
+        mistake.learning,
+        mistake.created_at,
+      ].some(matches)
+    );
+    const meetingResults = meetings.filter((meeting) =>
+      [
+        meeting.title,
+        meeting.time,
+        meeting.tag,
+        meeting.notes,
+        meeting.created_at,
+      ].some(matches)
+    );
+
+    const total =
+      taskResults.length +
+      logResults.length +
+      noteResults.length +
+      projectNoteResults.length +
+      mistakeResults.length +
+      meetingResults.length;
+
+    return (
+      <section className="space-y-6">
+        <div className="card p-6">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="section-title">Search Results</h2>
+              <p className="text-sm text-slate-500">
+                {total} matches for "{searchQuery}"
+              </p>
+            </div>
+            {searchError && <p className="text-xs text-rose-400">{searchError}</p>}
+          </div>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="card p-6 space-y-3">
+            <h3 className="text-sm font-semibold text-slate-700">Tasks</h3>
+            {taskResults.length === 0 && (
+              <p className="text-sm text-slate-400">No task matches.</p>
+            )}
+            {taskResults.map((task) => (
+              <div
+                key={task.id}
+                className="rounded-2xl border border-slate-200 bg-white/80 p-4"
+              >
+                <p className="text-sm font-semibold text-slate-700">{task.title}</p>
+                {task.description && (
+                  <p className="text-xs text-slate-500">{task.description}</p>
+                )}
+                <p className="text-xs text-slate-400">
+                  {task.date} · {task.status}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div className="card p-6 space-y-3">
+            <h3 className="text-sm font-semibold text-slate-700">Notes</h3>
+            {noteResults.length === 0 && (
+              <p className="text-sm text-slate-400">No note matches.</p>
+            )}
+            {noteResults.map((note) => (
+              <div
+                key={note.id}
+                className="rounded-2xl border border-slate-200 bg-white/80 p-4"
+              >
+                <p className="text-sm font-semibold text-slate-700">
+                  {note.title || "Untitled note"}
+                </p>
+                <p className="text-xs text-slate-500 line-clamp-3">{note.content}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="card p-6 space-y-3">
+            <h3 className="text-sm font-semibold text-slate-700">Project Notes</h3>
+            {projectNoteResults.length === 0 && (
+              <p className="text-sm text-slate-400">No project note matches.</p>
+            )}
+            {projectNoteResults.map((note) => (
+              <div
+                key={note.id}
+                className="rounded-2xl border border-slate-200 bg-white/80 p-4"
+              >
+                <p className="text-sm font-semibold text-slate-700">
+                  {note.title || "Project note"}
+                </p>
+                <p className="text-xs text-slate-500 line-clamp-3">{note.content}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="card p-6 space-y-3">
+            <h3 className="text-sm font-semibold text-slate-700">Daily Logs</h3>
+            {logResults.length === 0 && (
+              <p className="text-sm text-slate-400">No log matches.</p>
+            )}
+            {logResults.map((log, index) => (
+              <div
+                key={log.id || log.log_date || `log-${index}`}
+                className="rounded-2xl border border-slate-200 bg-white/80 p-4"
+              >
+                <p className="text-sm font-semibold text-slate-700">{log.log_date}</p>
+                <p className="text-xs text-slate-500">
+                  Hours {log.hours || "-"} · Rating {log.rating || "-"}
+                </p>
+                <p className="text-xs text-slate-500 line-clamp-2">
+                  {log.notes || log.insights || log.tasks_completed || "Log entry"}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div className="card p-6 space-y-3">
+            <h3 className="text-sm font-semibold text-slate-700">Mistakes</h3>
+            {mistakeResults.length === 0 && (
+              <p className="text-sm text-slate-400">No mistake matches.</p>
+            )}
+            {mistakeResults.map((mistake) => (
+              <div
+                key={mistake.id}
+                className="rounded-2xl border border-slate-200 bg-white/80 p-4"
+              >
+                <p className="text-sm font-semibold text-slate-700">
+                  {mistake.problem}
+                </p>
+                <p className="text-xs text-slate-500">{mistake.learning || "-"}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="card p-6 space-y-3 lg:col-span-2">
+            <h3 className="text-sm font-semibold text-slate-700">Meetings</h3>
+            {meetingResults.length === 0 && (
+              <p className="text-sm text-slate-400">No meeting matches.</p>
+            )}
+            <div className="grid gap-3 md:grid-cols-2">
+              {meetingResults.map((meeting) => (
+                <div
+                  key={meeting.id}
+                  className="rounded-2xl border border-slate-200 bg-white/80 p-4"
+                >
+                  <p className="text-sm font-semibold text-slate-700">
+                    {meeting.title}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {meeting.time} · {meeting.tag}
+                  </p>
+                  <p className="text-xs text-slate-500 line-clamp-2">
+                    {meeting.notes || "No notes"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  };
+
   const renderSection = () => {
+    if (searchQuery.trim()) {
+      return renderSearchResults();
+    }
     switch (activeNav) {
-      case "Projects":
+      case "Tasks":
         return renderProjects();
       case "Calendar":
         return renderCalendar();
       case "AI Insights":
         return renderInsights();
+      case "Notes":
+        return renderNotes();
+      case "Project Notes":
+        return renderProjectNotes();
       case "Meetings":
         return renderMeetings();
       case "Time Tracker":
@@ -731,7 +1163,11 @@ const Dashboard = ({
   return (
     <div className="min-h-screen px-5 py-8 lg:px-10">
       <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
-        <Sidebar activeNav={activeNav} onNavigate={setActiveNav} />
+        <Sidebar
+          activeNav={activeNav}
+          onNavigate={setActiveNav}
+          onLogout={onLocalSignOut}
+        />
         <main className="space-y-6">
           <Header
             session={session}
@@ -740,6 +1176,8 @@ const Dashboard = ({
             onEmailChange={onEmailChange}
             onSignIn={onSignIn}
             onSignOut={onSignOut}
+            searchValue={searchQuery}
+            onSearchChange={setSearchQuery}
           />
           {renderSection()}
         </main>

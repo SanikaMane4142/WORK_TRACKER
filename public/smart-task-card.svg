@@ -1,0 +1,63 @@
+<svg width="720" height="1080" viewBox="0 0 720 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="55%" stop-color="#1e1b4b"/>
+      <stop offset="100%" stop-color="#0b1120"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#0ea5e9"/>
+    </linearGradient>
+    <linearGradient id="platform" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1f2937"/>
+      <stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.05"/>
+    </linearGradient>
+    <filter id="shadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#0b1120" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+
+  <rect x="36" y="36" width="648" height="1008" rx="48" fill="url(#bg)"/>
+
+  <g filter="url(#shadow)">
+    <rect x="140" y="190" width="440" height="280" rx="28" fill="url(#platform)" stroke="#263144"/>
+    <rect x="180" y="230" width="180" height="120" rx="20" fill="#0b1220" stroke="#263144"/>
+    <rect x="390" y="220" width="150" height="170" rx="20" fill="#0b1220" stroke="#263144"/>
+    <rect x="210" y="260" width="110" height="12" rx="6" fill="#334155"/>
+    <rect x="210" y="286" width="140" height="12" rx="6" fill="#1f2937"/>
+    <rect x="410" y="250" width="90" height="12" rx="6" fill="#334155"/>
+    <rect x="410" y="276" width="120" height="12" rx="6" fill="#1f2937"/>
+    <rect x="410" y="302" width="80" height="12" rx="6" fill="#1f2937"/>
+  </g>
+
+  <g>
+    <rect x="170" y="520" width="380" height="200" rx="26" fill="url(#glass)" stroke="#2b3550"/>
+    <circle cx="220" cy="580" r="24" fill="#0f172a" stroke="#22d3ee" stroke-width="6"/>
+    <circle cx="500" cy="620" r="24" fill="#0f172a" stroke="#0ea5e9" stroke-width="6"/>
+    <rect x="250" y="560" width="200" height="12" rx="6" fill="#334155"/>
+    <rect x="250" y="586" width="160" height="12" rx="6" fill="#1f2937"/>
+    <rect x="250" y="642" width="200" height="12" rx="6" fill="#334155"/>
+    <rect x="250" y="668" width="140" height="12" rx="6" fill="#1f2937"/>
+  </g>
+
+  <g>
+    <rect x="140" y="760" width="440" height="220" rx="28" fill="#0b1220" stroke="#1f2a44"/>
+    <text x="180" y="830" font-family="Segoe UI, Arial, sans-serif" font-size="34" fill="#ffffff" font-weight="600">Smart Task</text>
+    <text x="180" y="872" font-family="Segoe UI, Arial, sans-serif" font-size="34" fill="#ffffff" font-weight="600">Management</text>
+    <text x="180" y="916" font-family="Segoe UI, Arial, sans-serif" font-size="18" fill="#cbd5f5">
+      Plan, track, and focus on what matters
+    </text>
+    <text x="180" y="940" font-family="Segoe UI, Arial, sans-serif" font-size="18" fill="#cbd5f5">
+      with weekly insights and clean summaries.
+    </text>
+    <rect x="180" y="970" width="170" height="46" rx="23" fill="url(#accent)"/>
+    <text x="210" y="1001" font-family="Segoe UI, Arial, sans-serif" font-size="18" fill="#0b1120" font-weight="600">Get started</text>
+    <circle cx="520" cy="993" r="18" fill="#0f172a" stroke="#22d3ee"/>
+    <path d="M514 993H526M522 989L526 993L522 997" stroke="#67e8f9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

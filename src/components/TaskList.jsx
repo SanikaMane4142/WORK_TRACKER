@@ -13,7 +13,7 @@ const tomorrowString = () => {
   return date.toISOString().split("T")[0];
 };
 
-const TaskList = ({ onTasksUpdate }) => {
+const TaskList = ({ onTasksUpdate, searchQuery = "" }) => {
   const [tasks, setTasks] = useState([]);
   const [filter, setFilter] = useState("today");
   const [loading, setLoading] = useState(false);
@@ -46,14 +46,31 @@ const TaskList = ({ onTasksUpdate }) => {
   }, []);
 
   const filteredTasks = useMemo(() => {
-    if (filter === "today") {
-      return tasks.filter((task) => task.date === today);
-    }
-    if (filter === "tomorrow") {
-      return tasks.filter((task) => task.date === tomorrow);
-    }
-    return tasks;
-  }, [tasks, filter, today, tomorrow]);
+    const query = searchQuery.trim().toLowerCase();
+    const base =
+      query.length > 0
+        ? tasks
+        : filter === "today"
+        ? tasks.filter((task) => task.date === today)
+        : filter === "tomorrow"
+        ? tasks.filter((task) => task.date === tomorrow)
+        : tasks;
+
+    if (!query) return base;
+
+    return base.filter((task) => {
+      const haystack = [
+        task.title,
+        task.description,
+        task.date,
+        task.status,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [tasks, filter, today, tomorrow, searchQuery]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -124,7 +141,7 @@ const TaskList = ({ onTasksUpdate }) => {
         <div>
           <h2 className="section-title">Task Tracker</h2>
           <p className="text-sm text-white/60">
-            {counts.today} today · {counts.tomorrow} tomorrow · {counts.done} done
+            {counts.today} today Â· {counts.tomorrow} tomorrow Â· {counts.done} done
           </p>
         </div>
         <div className="flex gap-2">

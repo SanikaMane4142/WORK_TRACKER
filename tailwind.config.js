@@ -12,12 +12,12 @@ export default {
       colors: {
         ink: "#0f172a",
         slate: colors.slate,
-        ocean: "#6366f1",
-        mint: "#a5b4fc",
+        ocean: "#0ea5e9",
+        mint: "#5eead4",
         sand: "#f6f1ea",
       },
       boxShadow: {
-        glow: "0 12px 40px rgba(99, 102, 241, 0.18)",
+        glow: "0 12px 40px rgba(14, 165, 233, 0.2)",
         card: "0 18px 50px rgba(15, 23, 42, 0.08)",
       },
       keyframes: {

@@ -205,3 +205,42 @@ export const addMistake = (payload) => supabase.from("mistakes").insert([payload
 
 export const deleteMistake = (id) =>
   supabase.from("mistakes").delete().eq("id", id);
+
+export const fetchNotes = () =>
+  supabase.from("notes").select("*").order("created_at", { ascending: false });
+
+export const addNote = (payload) => supabase.from("notes").insert([payload]);
+
+export const updateNote = (id, updates) =>
+  supabase.from("notes").update(updates).eq("id", id);
+
+export const deleteNote = (id) =>
+  supabase.from("notes").delete().eq("id", id);
+
+export const fetchProjects = () =>
+  supabase.from("projects").select("*").order("created_at", { ascending: false });
+
+export const addProject = (payload) =>
+  supabase.from("projects").insert([payload]).select().single();
+
+export const deleteProject = (id) =>
+  supabase.from("projects").delete().eq("id", id);
+
+export const fetchProjectNotes = (projectId) =>
+  supabase
+    .from("project_notes")
+    .select("*")
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: false });
+
+export const fetchAllProjectNotes = () =>
+  supabase.from("project_notes").select("*").order("created_at", { ascending: false });
+
+export const addProjectNote = (payload) =>
+  supabase.from("project_notes").insert([payload]);
+
+export const updateProjectNote = (id, updates) =>
+  supabase.from("project_notes").update(updates).eq("id", id);
+
+export const deleteProjectNote = (id) =>
+  supabase.from("project_notes").delete().eq("id", id);
