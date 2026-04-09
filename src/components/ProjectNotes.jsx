@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   addProject,
   addProjectNote,
@@ -20,9 +22,9 @@ const ProjectNotes = () => {
   const [projectName, setProjectName] = useState("");
   const [noteForm, setNoteForm] = useState({
     title: "",
-    content: "",
     changedFiles: "",
     important: false,
+    content: "",
     photos: [],
   });
   const [editingNoteId, setEditingNoteId] = useState(null);
@@ -47,8 +49,21 @@ const ProjectNotes = () => {
     return [];
   };
 
-  const normalizePhotoItems = (value) =>
-    normalizePhotoUrls(value).map((url) => ({ kind: "existing", url }));
+  const normalizePhotoItems = (note) => {
+    if (Array.isArray(note?.photo_items)) {
+      return note.photo_items.map((item, index) => ({
+        id: `${note.id}-photo-${index}`,
+        url: item?.url || "",
+        description: item?.description || "",
+      }));
+    }
+    const photoUrls = normalizePhotoUrls(note?.photo_urls);
+    return photoUrls.map((url, index) => ({
+      id: `${note.id}-photo-${index}`,
+      url,
+      description: "",
+    }));
+  };
 
   const loadProjects = async () => {
     const { data, error: loadError } = await fetchProjects();
@@ -115,48 +130,11 @@ const ProjectNotes = () => {
     setNoteForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handlePhotoUpload = async (event) => {
-    const files = Array.from(event.target.files || []);
-    if (files.length === 0) return;
-
-    const imageFiles = files.filter((file) => file.type.startsWith("image/"));
-    if (imageFiles.length === 0) {
-      setError("Only image files are supported.");
-      event.target.value = "";
-      return;
-    }
-
-    if (noteForm.photos.length + imageFiles.length > MAX_PHOTOS) {
-      setError(`You can add up to ${MAX_PHOTOS} photos per note.`);
-      event.target.value = "";
-      return;
-    }
-
-    try {
-      setNoteForm((prev) => ({
-        ...prev,
-        photos: [
-          ...prev.photos,
-          ...imageFiles.map((file) => ({
-            kind: "new",
-            file,
-            preview: URL.createObjectURL(file),
-          })),
-        ],
-      }));
-      setError("");
-    } catch {
-      setError("Could not read one of the images. Try a smaller file.");
-    } finally {
-      event.target.value = "";
-    }
-  };
-
-  const handleRemovePhoto = async (index) => {
-    const target = noteForm.photos[index];
+  const handleRemovePhoto = async (photoId) => {
+    const target = noteForm.photos.find((photo) => photo.id === photoId);
     if (!target) return;
 
-    if (target.kind === "existing") {
+    if (target.url) {
       const { error: deleteError } = await deleteProjectNotePhotos([target.url]);
       if (deleteError) {
         setError("Could not delete photo from storage.");
@@ -164,17 +142,72 @@ const ProjectNotes = () => {
       }
     }
 
-    if (target.kind === "new" && target.preview) {
+    if (target.preview) {
       URL.revokeObjectURL(target.preview);
     }
 
     setNoteForm((prev) => ({
       ...prev,
-      photos: prev.photos.filter((_, idx) => idx !== index),
+      photos: prev.photos.filter((photo) => photo.id !== photoId),
     }));
     setError("");
   };
 
+  const handleAddPhoto = () => {
+    const imageCount = noteForm.photos.length;
+    if (imageCount >= MAX_PHOTOS) {
+      setError(`You can add up to ${MAX_PHOTOS} photos per note.`);
+      return;
+    }
+    setNoteForm((prev) => ({
+      ...prev,
+      photos: [
+        ...prev.photos,
+        {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          file: null,
+          preview: "",
+          url: "",
+          description: "",
+        },
+      ],
+    }));
+  };
+
+  const handlePhotoFileSelect = (photoId) => async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Only image files are supported.");
+      event.target.value = "";
+      return;
+    }
+    setNoteForm((prev) => ({
+      ...prev,
+      photos: prev.photos.map((photo) => {
+        if (photo.id !== photoId) return photo;
+        if (photo.preview) URL.revokeObjectURL(photo.preview);
+        return {
+          ...photo,
+          file,
+          preview: URL.createObjectURL(file),
+          url: "",
+        };
+      }),
+    }));
+    setError("");
+    event.target.value = "";
+  };
+
+  const handlePhotoDescriptionChange = (photoId) => (event) => {
+    const value = event.target.value;
+    setNoteForm((prev) => ({
+      ...prev,
+      photos: prev.photos.map((photo) =>
+        photo.id === photoId ? { ...photo, description: value } : photo
+      ),
+    }));
+  };
   const handleAddNote = async (event) => {
     event.preventDefault();
     setError("");
@@ -182,16 +215,15 @@ const ProjectNotes = () => {
       setError("Select a project first.");
       return;
     }
-    if (!noteForm.content.trim()) {
-      setError("Note content is required.");
+    const hasContent =
+      noteForm.content.trim() ||
+      noteForm.photos.some((photo) => photo.url || photo.preview || photo.file);
+    if (!hasContent) {
+      setError("Add some text or at least one photo.");
       return;
     }
-    const existingUrls = noteForm.photos
-      .filter((photo) => photo.kind === "existing")
-      .map((photo) => photo.url);
-    const newFiles = noteForm.photos
-      .filter((photo) => photo.kind === "new")
-      .map((photo) => photo.file);
+
+    const newFiles = noteForm.photos.filter((photo) => photo.file).map((photo) => photo.file);
 
     let uploadedUrls = [];
     if (newFiles.length > 0) {
@@ -207,13 +239,37 @@ const ProjectNotes = () => {
       uploadedUrls = uploadUrls || [];
     }
 
+    let uploadIndex = 0;
+    const resolvedPhotos = noteForm.photos.map((photo) => {
+      if (photo.file) {
+        const nextUrl = uploadedUrls[uploadIndex];
+        uploadIndex += 1;
+        return {
+          ...photo,
+          url: nextUrl || "",
+          file: null,
+          preview: "",
+        };
+      }
+      return photo;
+    });
+
+    const photoUrls = resolvedPhotos.map((photo) => photo.url).filter(Boolean);
+    const photoItems = resolvedPhotos
+      .filter((photo) => photo.url)
+      .map((photo) => ({
+        url: photo.url,
+        description: photo.description || "",
+      }));
+
     const payload = {
       project_id: selectedProject.id,
       title: noteForm.title.trim() || "Project note",
       content: noteForm.content.trim(),
       changed_files: noteForm.changedFiles.trim(),
       important: noteForm.important,
-      photo_urls: [...existingUrls, ...uploadedUrls],
+      photo_urls: photoUrls,
+      photo_items: photoItems,
     };
     const { error: saveError } = editingNoteId
       ? await updateProjectNote(editingNoteId, payload)
@@ -223,15 +279,15 @@ const ProjectNotes = () => {
       return;
     }
     noteForm.photos.forEach((photo) => {
-      if (photo.kind === "new" && photo.preview) {
+      if (photo.preview) {
         URL.revokeObjectURL(photo.preview);
       }
     });
     setNoteForm({
       title: "",
-      content: "",
       changedFiles: "",
       important: false,
+      content: "",
       photos: [],
     });
     setEditingNoteId(null);
@@ -253,7 +309,11 @@ const ProjectNotes = () => {
       content: note.content || "",
       changedFiles: note.changed_files || "",
       important: Boolean(note.important),
-      photos: normalizePhotoItems(note.photo_urls),
+      photos: normalizePhotoItems(note).map((item) => ({
+        ...item,
+        file: null,
+        preview: "",
+      })),
     });
     setEditingNoteId(note.id);
     setError("");
@@ -261,13 +321,89 @@ const ProjectNotes = () => {
 
   const handleCancelEdit = () => {
     noteForm.photos.forEach((photo) => {
-      if (photo.kind === "new" && photo.preview) {
+      if (photo.preview) {
         URL.revokeObjectURL(photo.preview);
       }
     });
-    setNoteForm({ title: "", content: "", changedFiles: "", important: false, photos: [] });
+    setNoteForm({
+      title: "",
+      changedFiles: "",
+      important: false,
+      content: "",
+      photos: [],
+    });
     setEditingNoteId(null);
     setError("");
+  };
+
+  const formatNoteContent = (content) => {
+    if (!content) return "";
+    if (content.includes("|")) return content;
+    const lines = content.split(/\r?\n/);
+    const hasMarker = lines.some((line) => line.trim().toUpperCase() === "TABLE");
+    if (!hasMarker) return content;
+    const output = [];
+    let i = 0;
+    const splitBySpaces = (value) =>
+      value
+        .trim()
+        .split(/\s{2,}/)
+        .map((cell) => cell.trim())
+        .filter(Boolean);
+    let convertNextBlock = false;
+    while (i < lines.length) {
+      const line = lines[i];
+      if (line?.trim().toUpperCase() === "TABLE") {
+        convertNextBlock = true;
+        i += 1;
+        continue;
+      }
+      const hasTabs = line?.includes("\t");
+      const spaceCells = line ? splitBySpaces(line) : [];
+      const hasSpaceTable = spaceCells.length >= 2;
+      if (!line || (!convertNextBlock && (!hasTabs && !hasSpaceTable))) {
+        output.push(line);
+        i += 1;
+        continue;
+      }
+      if (!convertNextBlock) {
+        output.push(line);
+        i += 1;
+        continue;
+      }
+      const block = [];
+      while (
+        i < lines.length &&
+        lines[i] &&
+        (lines[i].includes("\t") || splitBySpaces(lines[i]).length >= 2)
+      ) {
+        block.push(lines[i]);
+        i += 1;
+      }
+      if (block.length >= 2) {
+        const headerCells = block[0].includes("\t")
+          ? block[0].split("\t").map((cell) => cell.trim())
+          : splitBySpaces(block[0]);
+        const separator = headerCells.map(() => "---");
+        output.push(`| ${headerCells.join(" | ")} |`);
+        output.push(`| ${separator.join(" | ")} |`);
+        block.slice(1).forEach((row) => {
+          const cells = row.includes("\t")
+            ? row.split("\t").map((cell) => cell.trim())
+            : splitBySpaces(row);
+          output.push(`| ${cells.join(" | ")} |`);
+        });
+        convertNextBlock = false;
+      } else {
+        output.push(...block);
+        convertNextBlock = false;
+      }
+      if (i < lines.length && lines[i] === "") {
+        output.push("");
+        i += 1;
+      }
+    }
+    return output.join("\n");
   };
 
   return (
@@ -361,6 +497,59 @@ const ProjectNotes = () => {
             value={noteForm.content}
             onChange={handleNoteChange("content")}
           />
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs text-white/60">
+                Photos with descriptions (up to {MAX_PHOTOS})
+              </label>
+              <button
+                type="button"
+                onClick={handleAddPhoto}
+                className="rounded-full border border-white/20 px-3 py-1 text-[11px] text-white transition hover:border-white/60"
+              >
+                Add photo
+              </button>
+            </div>
+            {noteForm.photos.map((photo) => (
+              <div
+                key={photo.id}
+                className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3"
+              >
+                <div className="flex items-center justify-between text-xs text-white/60">
+                  <span>Photo</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemovePhoto(photo.id)}
+                    className="rounded-full border border-white/20 px-3 py-1 text-[11px] text-white transition hover:border-white/60"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoFileSelect(photo.id)}
+                  className="rounded-2xl bg-white/10 px-4 py-3 text-sm text-white file:mr-4 file:rounded-full file:border-0 file:bg-white/20 file:px-4 file:py-2 file:text-xs file:text-white/80"
+                />
+                {(photo.preview || photo.url) && (
+                  <div className="relative h-32 w-32 overflow-hidden rounded-2xl border border-white/10">
+                    <img
+                      src={photo.preview || photo.url}
+                      alt="Project note"
+                      className="h-full w-full object-cover"
+                      onClick={() => setPreviewUrl(photo.preview || photo.url)}
+                    />
+                  </div>
+                )}
+                <input
+                  className="rounded-2xl bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-ocean"
+                  placeholder="Description for this photo"
+                  value={photo.description}
+                  onChange={handlePhotoDescriptionChange(photo.id)}
+                />
+              </div>
+            ))}
+          </div>
           <textarea
             rows="2"
             className="rounded-2xl bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-ocean"
@@ -368,46 +557,6 @@ const ProjectNotes = () => {
             value={noteForm.changedFiles}
             onChange={handleNoteChange("changedFiles")}
           />
-          <div className="grid gap-2">
-            <label className="text-xs text-white/60">
-              Add photos (up to {MAX_PHOTOS})
-            </label>
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handlePhotoUpload}
-              className="rounded-2xl bg-white/10 px-4 py-3 text-sm text-white file:mr-4 file:rounded-full file:border-0 file:bg-white/20 file:px-4 file:py-2 file:text-xs file:text-white/80"
-            />
-            {noteForm.photos.length > 0 && (
-              <div className="flex flex-wrap gap-3">
-                {noteForm.photos.map((photo, index) => (
-                  <div
-                    key={`${photo.kind}-${photo.url || photo.preview}-${index}`}
-                    className="relative h-20 w-20 overflow-hidden rounded-2xl border border-white/10"
-                  >
-                    <img
-                      src={photo.kind === "existing" ? photo.url : photo.preview}
-                      alt="Project note"
-                      className="h-full w-full object-cover"
-                      onClick={() =>
-                        setPreviewUrl(
-                          photo.kind === "existing" ? photo.url : photo.preview
-                        )
-                      }
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleRemovePhoto(index)}
-                      className="absolute right-1 top-1 rounded-full bg-ink/80 px-2 py-1 text-[10px] text-white"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
           <label className="flex items-center gap-2 rounded-2xl bg-white/5 px-4 py-3 text-sm text-white/70">
             <input
               type="checkbox"
@@ -438,7 +587,7 @@ const ProjectNotes = () => {
             <p className="text-sm text-white/60">No project notes yet.</p>
           )}
           {filteredNotes.map((note) => {
-            const photoUrls = normalizePhotoUrls(note.photo_urls);
+            const photoItems = normalizePhotoItems(note);
             return (
               <div
                 key={note.id}
@@ -472,27 +621,35 @@ const ProjectNotes = () => {
                   </button>
                 </div>
               </div>
-              <p className="mt-3 whitespace-pre-wrap text-sm text-white/70">
-                {note.content}
-              </p>
               {note.changed_files && (
                 <p className="mt-3 text-xs text-white/50">
                   Files changed: {note.changed_files}
                 </p>
               )}
-              {photoUrls.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-3">
-                  {photoUrls.map((photo, index) => (
-                    <div
-                      key={`${note.id}-photo-${index}`}
-                      className="h-20 w-20 overflow-hidden rounded-2xl border border-white/10"
-                    >
-                      <img
-                        src={photo}
-                        alt="Project note"
-                        className="h-full w-full object-cover"
-                        onClick={() => setPreviewUrl(photo)}
-                      />
+              {note.content && (
+                <div className="mt-3 project-note-markdown">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {formatNoteContent(note.content)}
+                  </ReactMarkdown>
+                </div>
+              )}
+              {photoItems.length > 0 && (
+                <div className="mt-3 space-y-3">
+                  {photoItems.map((photo, index) => (
+                    <div key={`${note.id}-photo-${index}`} className="space-y-2">
+                      {photo.url && (
+                        <div className="h-24 w-24 overflow-hidden rounded-2xl border border-white/10">
+                          <img
+                            src={photo.url}
+                            alt="Project note"
+                            className="h-full w-full object-cover"
+                            onClick={() => setPreviewUrl(photo.url)}
+                          />
+                        </div>
+                      )}
+                      {photo.description && (
+                        <p className="text-xs text-white/60">{photo.description}</p>
+                      )}
                     </div>
                   ))}
                 </div>

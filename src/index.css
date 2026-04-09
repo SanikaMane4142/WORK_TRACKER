@@ -77,3 +77,58 @@ body {
 .placeholder\:text-white\/50::placeholder {
   color: rgba(15, 23, 42, 0.45);
 }
+
+.project-note-markdown {
+  @apply text-sm text-white/70;
+}
+
+.project-note-markdown p {
+  @apply mb-2;
+}
+
+.project-note-markdown h1,
+.project-note-markdown h2,
+.project-note-markdown h3 {
+  @apply mt-4 font-display text-base text-ink;
+}
+
+.project-note-markdown ul {
+  @apply mb-2 list-disc pl-5;
+}
+
+.project-note-markdown ol {
+  @apply mb-2 list-decimal pl-5;
+}
+
+.project-note-markdown blockquote {
+  @apply my-2 border-l-2 border-slate-300 pl-3 text-white/60;
+}
+
+.project-note-markdown table {
+  @apply mt-3 w-full border-collapse text-left text-[12px] sm:text-sm;
+}
+
+.project-note-markdown th,
+.project-note-markdown td {
+  @apply border border-slate-200 px-3 py-2 align-top;
+}
+
+.project-note-markdown th {
+  @apply bg-slate-100 font-semibold text-ink;
+}
+
+.project-note-markdown strong {
+  @apply font-semibold text-ink;
+}
+
+.project-note-markdown em {
+  @apply italic;
+}
+
+.project-note-markdown code {
+  @apply rounded bg-slate-100 px-1 py-0.5 text-[12px] text-ink;
+}
+
+.project-note-markdown pre {
+  @apply mt-2 overflow-x-auto rounded-xl bg-slate-100 p-3 text-[12px] text-ink;
+}
