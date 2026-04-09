@@ -29,6 +29,7 @@ const ProjectNotes = () => {
   const [filterToday, setFilterToday] = useState(false);
   const [filterImportant, setFilterImportant] = useState(false);
   const [error, setError] = useState("");
+  const [previewUrl, setPreviewUrl] = useState("");
   const MAX_PHOTOS = 6;
 
   const normalizePhotoUrls = (value) => {
@@ -389,6 +390,11 @@ const ProjectNotes = () => {
                       src={photo.kind === "existing" ? photo.url : photo.preview}
                       alt="Project note"
                       className="h-full w-full object-cover"
+                      onClick={() =>
+                        setPreviewUrl(
+                          photo.kind === "existing" ? photo.url : photo.preview
+                        )
+                      }
                     />
                     <button
                       type="button"
@@ -485,6 +491,7 @@ const ProjectNotes = () => {
                         src={photo}
                         alt="Project note"
                         className="h-full w-full object-cover"
+                        onClick={() => setPreviewUrl(photo)}
                       />
                     </div>
                   ))}
@@ -500,6 +507,31 @@ const ProjectNotes = () => {
           })}
         </div>
       </div>
+      {previewUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-6"
+          onClick={() => setPreviewUrl("")}
+          role="presentation"
+        >
+          <div
+            className="relative max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-3xl border border-white/10 bg-slate-950/90 p-4"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="absolute right-4 top-4 rounded-full border border-white/20 px-3 py-1 text-xs text-white/80 transition hover:border-white/60"
+              onClick={() => setPreviewUrl("")}
+            >
+              Close
+            </button>
+            <img
+              src={previewUrl}
+              alt="Preview"
+              className="max-h-[80vh] w-full rounded-2xl object-contain"
+            />
+          </div>
+        </div>
+      )}
     </section>
   );
 };
