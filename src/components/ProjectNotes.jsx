@@ -6,6 +6,8 @@ import {
   deleteProjectNote,
   fetchProjectNotes,
   fetchProjects,
+  deleteProjectNotePhotos,
+  uploadProjectNotePhotos,
   updateProjectNote,
 } from "../services/supabaseClient";
 
@@ -21,11 +23,31 @@ const ProjectNotes = () => {
     content: "",
     changedFiles: "",
     important: false,
+    photos: [],
   });
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [filterToday, setFilterToday] = useState(false);
   const [filterImportant, setFilterImportant] = useState(false);
   const [error, setError] = useState("");
+  const MAX_PHOTOS = 6;
+
+  const normalizePhotoUrls = (value) => {
+    if (Array.isArray(value)) return value.filter(Boolean);
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) return [];
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) return parsed.filter(Boolean);
+      } catch {
+        return [trimmed];
+      }
+    }
+    return [];
+  };
+
+  const normalizePhotoItems = (value) =>
+    normalizePhotoUrls(value).map((url) => ({ kind: "existing", url }));
 
   const loadProjects = async () => {
     const { data, error: loadError } = await fetchProjects();
@@ -92,6 +114,66 @@ const ProjectNotes = () => {
     setNoteForm((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handlePhotoUpload = async (event) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+
+    const imageFiles = files.filter((file) => file.type.startsWith("image/"));
+    if (imageFiles.length === 0) {
+      setError("Only image files are supported.");
+      event.target.value = "";
+      return;
+    }
+
+    if (noteForm.photos.length + imageFiles.length > MAX_PHOTOS) {
+      setError(`You can add up to ${MAX_PHOTOS} photos per note.`);
+      event.target.value = "";
+      return;
+    }
+
+    try {
+      setNoteForm((prev) => ({
+        ...prev,
+        photos: [
+          ...prev.photos,
+          ...imageFiles.map((file) => ({
+            kind: "new",
+            file,
+            preview: URL.createObjectURL(file),
+          })),
+        ],
+      }));
+      setError("");
+    } catch {
+      setError("Could not read one of the images. Try a smaller file.");
+    } finally {
+      event.target.value = "";
+    }
+  };
+
+  const handleRemovePhoto = async (index) => {
+    const target = noteForm.photos[index];
+    if (!target) return;
+
+    if (target.kind === "existing") {
+      const { error: deleteError } = await deleteProjectNotePhotos([target.url]);
+      if (deleteError) {
+        setError("Could not delete photo from storage.");
+        return;
+      }
+    }
+
+    if (target.kind === "new" && target.preview) {
+      URL.revokeObjectURL(target.preview);
+    }
+
+    setNoteForm((prev) => ({
+      ...prev,
+      photos: prev.photos.filter((_, idx) => idx !== index),
+    }));
+    setError("");
+  };
+
   const handleAddNote = async (event) => {
     event.preventDefault();
     setError("");
@@ -103,12 +185,34 @@ const ProjectNotes = () => {
       setError("Note content is required.");
       return;
     }
+    const existingUrls = noteForm.photos
+      .filter((photo) => photo.kind === "existing")
+      .map((photo) => photo.url);
+    const newFiles = noteForm.photos
+      .filter((photo) => photo.kind === "new")
+      .map((photo) => photo.file);
+
+    let uploadedUrls = [];
+    if (newFiles.length > 0) {
+      const { data: uploadUrls, error: uploadError } = await uploadProjectNotePhotos(
+        selectedProject.id,
+        newFiles
+      );
+      if (uploadError) {
+        const message = uploadError.message || "Could not upload photos.";
+        setError(`${message} Check your storage bucket access.`);
+        return;
+      }
+      uploadedUrls = uploadUrls || [];
+    }
+
     const payload = {
       project_id: selectedProject.id,
       title: noteForm.title.trim() || "Project note",
       content: noteForm.content.trim(),
       changed_files: noteForm.changedFiles.trim(),
       important: noteForm.important,
+      photo_urls: [...existingUrls, ...uploadedUrls],
     };
     const { error: saveError } = editingNoteId
       ? await updateProjectNote(editingNoteId, payload)
@@ -117,7 +221,18 @@ const ProjectNotes = () => {
       setError("Could not save project note.");
       return;
     }
-    setNoteForm({ title: "", content: "", changedFiles: "", important: false });
+    noteForm.photos.forEach((photo) => {
+      if (photo.kind === "new" && photo.preview) {
+        URL.revokeObjectURL(photo.preview);
+      }
+    });
+    setNoteForm({
+      title: "",
+      content: "",
+      changedFiles: "",
+      important: false,
+      photos: [],
+    });
     setEditingNoteId(null);
     loadNotes(selectedProject.id);
   };
@@ -130,6 +245,29 @@ const ProjectNotes = () => {
       return true;
     });
   }, [notes, filterImportant, filterToday]);
+
+  const handleEditNote = (note) => {
+    setNoteForm({
+      title: note.title || "",
+      content: note.content || "",
+      changedFiles: note.changed_files || "",
+      important: Boolean(note.important),
+      photos: normalizePhotoItems(note.photo_urls),
+    });
+    setEditingNoteId(note.id);
+    setError("");
+  };
+
+  const handleCancelEdit = () => {
+    noteForm.photos.forEach((photo) => {
+      if (photo.kind === "new" && photo.preview) {
+        URL.revokeObjectURL(photo.preview);
+      }
+    });
+    setNoteForm({ title: "", content: "", changedFiles: "", important: false, photos: [] });
+    setEditingNoteId(null);
+    setError("");
+  };
 
   return (
     <section className="grid gap-6 lg:grid-cols-[280px_1fr]">
@@ -229,6 +367,41 @@ const ProjectNotes = () => {
             value={noteForm.changedFiles}
             onChange={handleNoteChange("changedFiles")}
           />
+          <div className="grid gap-2">
+            <label className="text-xs text-white/60">
+              Add photos (up to {MAX_PHOTOS})
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handlePhotoUpload}
+              className="rounded-2xl bg-white/10 px-4 py-3 text-sm text-white file:mr-4 file:rounded-full file:border-0 file:bg-white/20 file:px-4 file:py-2 file:text-xs file:text-white/80"
+            />
+            {noteForm.photos.length > 0 && (
+              <div className="flex flex-wrap gap-3">
+                {noteForm.photos.map((photo, index) => (
+                  <div
+                    key={`${photo.kind}-${photo.url || photo.preview}-${index}`}
+                    className="relative h-20 w-20 overflow-hidden rounded-2xl border border-white/10"
+                  >
+                    <img
+                      src={photo.kind === "existing" ? photo.url : photo.preview}
+                      alt="Project note"
+                      className="h-full w-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemovePhoto(index)}
+                      className="absolute right-1 top-1 rounded-full bg-ink/80 px-2 py-1 text-[10px] text-white"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <label className="flex items-center gap-2 rounded-2xl bg-white/5 px-4 py-3 text-sm text-white/70">
             <input
               type="checkbox"
@@ -258,11 +431,13 @@ const ProjectNotes = () => {
           {filteredNotes.length === 0 && (
             <p className="text-sm text-white/60">No project notes yet.</p>
           )}
-          {filteredNotes.map((note) => (
-            <div
-              key={note.id}
-              className="rounded-2xl border border-white/10 bg-white/5 p-4"
-            >
+          {filteredNotes.map((note) => {
+            const photoUrls = normalizePhotoUrls(note.photo_urls);
+            return (
+              <div
+                key={note.id}
+                className="rounded-2xl border border-white/10 bg-white/5 p-4"
+              >
               <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                 <div>
                   <h3 className="font-display text-lg">
@@ -299,13 +474,30 @@ const ProjectNotes = () => {
                   Files changed: {note.changed_files}
                 </p>
               )}
+              {photoUrls.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-3">
+                  {photoUrls.map((photo, index) => (
+                    <div
+                      key={`${note.id}-photo-${index}`}
+                      className="h-20 w-20 overflow-hidden rounded-2xl border border-white/10"
+                    >
+                      <img
+                        src={photo}
+                        alt="Project note"
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
               {note.important && (
                 <span className="mt-3 inline-flex rounded-full bg-rose-500/20 px-3 py-1 text-xs text-rose-200">
                   Important
                 </span>
               )}
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>
@@ -313,17 +505,3 @@ const ProjectNotes = () => {
 };
 
 export default ProjectNotes;
-  const handleEditNote = (note) => {
-    setNoteForm({
-      title: note.title || "",
-      content: note.content || "",
-      changedFiles: note.changed_files || "",
-      important: Boolean(note.important),
-    });
-    setEditingNoteId(note.id);
-  };
-
-  const handleCancelEdit = () => {
-    setNoteForm({ title: "", content: "", changedFiles: "", important: false });
-    setEditingNoteId(null);
-  };

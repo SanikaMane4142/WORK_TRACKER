@@ -270,3 +270,68 @@ export const updateProjectNote = (id, updates) =>
 
 export const deleteProjectNote = (id) =>
   supabase.from("project_notes").delete().eq("id", id);
+
+const PROJECT_NOTE_BUCKET = "project_notes";
+
+const buildUploadPath = (projectId, fileName) => {
+  const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return `${projectId}/${unique}-${safeName}`;
+};
+
+export const uploadProjectNotePhotos = async (projectId, files = []) => {
+  if (!projectId) {
+    return { data: [], error: { message: "Missing project id." } };
+  }
+  if (!files.length) return { data: [], error: null };
+
+  const uploads = await Promise.all(
+    files.map(async (file) => {
+      const path = buildUploadPath(projectId, file.name || "photo");
+      const { error: uploadError } = await supabase.storage
+        .from(PROJECT_NOTE_BUCKET)
+        .upload(path, file, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: file.type || "image/*",
+        });
+      if (uploadError) {
+        return { url: null, error: uploadError };
+      }
+      const { data } = supabase.storage.from(PROJECT_NOTE_BUCKET).getPublicUrl(path);
+      return { url: data?.publicUrl || null, error: null };
+    })
+  );
+
+  const firstError = uploads.find((item) => item.error)?.error || null;
+  if (firstError) return { data: [], error: firstError };
+
+  return { data: uploads.map((item) => item.url).filter(Boolean), error: null };
+};
+
+const extractStoragePath = (publicUrl) => {
+  if (!publicUrl) return null;
+  try {
+    const url = new URL(publicUrl);
+    const marker = `/${PROJECT_NOTE_BUCKET}/`;
+    const index = url.pathname.indexOf(marker);
+    if (index === -1) return null;
+    return url.pathname.slice(index + marker.length);
+  } catch {
+    return null;
+  }
+};
+
+export const deleteProjectNotePhotos = async (urls = []) => {
+  const paths = urls
+    .map(extractStoragePath)
+    .filter(Boolean);
+  if (paths.length === 0) return { data: [], error: null };
+
+  const { data, error } = await supabase.storage
+    .from(PROJECT_NOTE_BUCKET)
+    .remove(paths);
+
+  if (error) return { data: null, error };
+  return { data: data || [], error: null };
+};
