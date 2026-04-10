@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { addExpense, deleteExpense, fetchExpenses } from "../services/supabaseClient";
 
 const todayString = () => new Date().toISOString().split("T")[0];
+const RUPEE = "\u20B9";
 
 const Expenses = ({ refreshKey = 0 }) => {
   const [form, setForm] = useState({
@@ -71,7 +72,8 @@ const Expenses = ({ refreshKey = 0 }) => {
           <p className="text-sm text-white/60">Track spending quickly each day.</p>
         </div>
         <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/70">
-          Today: ₹{todayTotal.toFixed(2)}
+          Today: {RUPEE}
+          {todayTotal.toFixed(2)}
         </span>
       </div>
 
@@ -121,7 +123,8 @@ const Expenses = ({ refreshKey = 0 }) => {
             <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="text-sm font-semibold text-white">
-                  ₹{Number(expense.amount || 0).toFixed(2)}
+                  {RUPEE}
+                  {Number(expense.amount || 0).toFixed(2)}
                 </p>
                 <p className="text-xs text-white/60">
                   {expense.category || "general"} · {expense.expense_date}

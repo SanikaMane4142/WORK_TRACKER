@@ -4,20 +4,29 @@
 
 :root {
   color-scheme: light;
+  --cute-bg: #fbfdff;
+  --cute-card: rgba(255, 255, 255, 0.88);
+  --cute-border: rgba(226, 232, 240, 0.85);
+  --cute-text: #0f172a;
+  --cute-shadow: 0 18px 55px rgba(15, 23, 42, 0.08);
 }
 
 body {
   font-family: "Inter", ui-sans-serif, system-ui;
-  background: radial-gradient(circle at 15% 20%, rgba(99, 102, 241, 0.18), transparent 55%),
-    radial-gradient(circle at 85% 10%, rgba(139, 92, 246, 0.12), transparent 50%),
-    radial-gradient(circle at 50% 110%, rgba(59, 130, 246, 0.16), transparent 55%),
-    #f8fafc;
+  background: radial-gradient(circle at 14% 18%, rgba(251, 113, 133, 0.14), transparent 50%),
+    radial-gradient(circle at 88% 8%, rgba(139, 92, 246, 0.12), transparent 52%),
+    radial-gradient(circle at 60% 112%, rgba(52, 211, 153, 0.14), transparent 55%),
+    radial-gradient(circle at 40% 40%, rgba(250, 204, 21, 0.08), transparent 55%),
+    var(--cute-bg);
   min-height: 100vh;
-  color: #0f172a;
+  color: var(--cute-text);
 }
 
 .card {
-  @apply rounded-2xl bg-white/80 border border-slate-200 shadow-card backdrop-blur;
+  background: var(--cute-card);
+  border: 1px solid var(--cute-border);
+  box-shadow: var(--cute-shadow);
+  @apply rounded-2xl backdrop-blur;
 }
 
 .section-title {
@@ -25,7 +34,13 @@ body {
 }
 
 .glow-divider {
-  background: linear-gradient(90deg, rgba(99, 102, 241, 0.5), rgba(139, 92, 246, 0.28), transparent);
+  background: linear-gradient(
+    90deg,
+    rgba(251, 113, 133, 0.55),
+    rgba(139, 92, 246, 0.3),
+    rgba(52, 211, 153, 0.22),
+    transparent
+  );
 }
 
 /* Legacy dark utility compatibility for existing components */
@@ -52,7 +67,7 @@ body {
   background-color: rgba(255, 255, 255, 0.85);
 }
 .bg-white\/10 {
-  background-color: rgba(238, 242, 255, 0.7);
+  background-color: rgba(238, 242, 255, 0.72);
 }
 .bg-white\/20 {
   background-color: rgba(224, 231, 255, 0.7);

@@ -668,6 +668,7 @@ const Dashboard = ({
   logs,
   onLogsUpdate,
 }) => {
+  const RUPEE = "\u20B9";
   const [activeNav, setActiveNav] = React.useState("Overview");
   const [searchQuery, setSearchQuery] = React.useState("");
   const [selectedDate, setSelectedDate] = React.useState(
@@ -1144,11 +1145,12 @@ const Dashboard = ({
         <div className="card p-5">
           <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
             Money spent
-          </p>
-          <p className="mt-3 text-2xl font-semibold text-slate-900">
-            ₹{todaysSummary.moneySpent.toFixed(2)}
-          </p>
-        </div>
+            </p>
+            <p className="mt-3 text-2xl font-semibold text-slate-900">
+            {RUPEE}
+            {todaysSummary.moneySpent.toFixed(2)}
+            </p>
+          </div>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[2fr_1fr]">
@@ -1486,9 +1488,10 @@ const Dashboard = ({
                 key={expense.id}
                 className="rounded-2xl border border-slate-200 bg-white/80 p-4"
               >
-                <p className="text-sm font-semibold text-slate-700">
-                  ₹{Number(expense.amount || 0).toFixed(2)}
-                </p>
+                  <p className="text-sm font-semibold text-slate-700">
+                  {RUPEE}
+                  {Number(expense.amount || 0).toFixed(2)}
+                  </p>
                 <p className="text-xs text-slate-500">
                   {expense.category || "general"} - {expense.expense_date}
                 </p>
