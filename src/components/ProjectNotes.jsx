@@ -12,6 +12,10 @@ import {
   uploadProjectNotePhotos,
   updateProjectNote,
 } from "../services/supabaseClient";
+import {
+  applyPasteToValue,
+  getPlainTextFromPasteEvent,
+} from "../utils/plainTextPaste";
 
 const toDateKey = (value) => new Date(value).toISOString().split("T")[0];
 
@@ -336,6 +340,35 @@ const ProjectNotes = () => {
     setError("");
   };
 
+  const handlePlainTextPaste = (field) => (event) => {
+    const pastedText = getPlainTextFromPasteEvent(event);
+    if (!pastedText) return;
+    event.preventDefault();
+
+    const target = event.target;
+    const selectionStart = target?.selectionStart;
+    const selectionEnd = target?.selectionEnd;
+
+    let nextCursor = null;
+    setNoteForm((prev) => {
+      const currentValue = prev[field] ?? "";
+      const next = applyPasteToValue({
+        value: currentValue,
+        pasteText: pastedText,
+        selectionStart,
+        selectionEnd,
+      });
+      nextCursor = next.nextCursor;
+      return { ...prev, [field]: next.nextValue };
+    });
+
+    if (typeof nextCursor === "number" && target && "setSelectionRange" in target) {
+      requestAnimationFrame(() => {
+        target.setSelectionRange(nextCursor, nextCursor);
+      });
+    }
+  };
+
   const formatNoteContent = (content) => {
     if (!content) return "";
     if (content.includes("|")) return content;
@@ -496,6 +529,7 @@ const ProjectNotes = () => {
             placeholder="Important notes for this project..."
             value={noteForm.content}
             onChange={handleNoteChange("content")}
+            onPaste={handlePlainTextPaste("content")}
           />
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -556,6 +590,7 @@ const ProjectNotes = () => {
             placeholder="Files/folders changed today (optional)"
             value={noteForm.changedFiles}
             onChange={handleNoteChange("changedFiles")}
+            onPaste={handlePlainTextPaste("changedFiles")}
           />
           <label className="flex items-center gap-2 rounded-2xl bg-white/5 px-4 py-3 text-sm text-white/70">
             <input

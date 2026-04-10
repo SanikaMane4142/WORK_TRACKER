@@ -89,7 +89,7 @@ body {
 .project-note-markdown h1,
 .project-note-markdown h2,
 .project-note-markdown h3 {
-  @apply mt-4 font-display text-base text-ink;
+  @apply mt-4 font-semibold text-sm text-white/80;
 }
 
 .project-note-markdown ul {
@@ -118,7 +118,7 @@ body {
 }
 
 .project-note-markdown strong {
-  @apply font-semibold text-ink;
+  @apply font-semibold text-white/90;
 }
 
 .project-note-markdown em {
@@ -126,9 +126,20 @@ body {
 }
 
 .project-note-markdown code {
-  @apply rounded bg-slate-100 px-1 py-0.5 text-[12px] text-ink;
+  @apply rounded bg-slate-100 px-1 py-0.5 text-sm text-ink;
 }
 
 .project-note-markdown pre {
-  @apply mt-2 overflow-x-auto rounded-xl bg-slate-100 p-3 text-[12px] text-ink;
+  @apply mt-2 overflow-x-auto rounded-xl bg-slate-100 p-3 text-sm text-ink;
+}
+
+.col-resize-handle {
+  @apply absolute right-0 top-0 flex h-full w-4 cursor-col-resize select-none items-center justify-center bg-transparent text-white/30 transition hover:bg-white/10 hover:text-white/70;
+}
+
+.col-resize-handle::before {
+  content: "<--->";
+  font-size: 10px;
+  line-height: 1;
+  pointer-events: none;
 }

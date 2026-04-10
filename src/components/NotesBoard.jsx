@@ -5,6 +5,10 @@ import {
   fetchNotes,
   updateNote,
 } from "../services/supabaseClient";
+import {
+  applyPasteToValue,
+  getPlainTextFromPasteEvent,
+} from "../utils/plainTextPaste";
 
 const formatDateTime = (value) => {
   if (!value) return "";
@@ -53,6 +57,35 @@ const NotesBoard = ({ searchQuery = "" }) => {
 
   const handleChange = (field) => (event) => {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
+  };
+
+  const handlePlainTextPaste = (field) => (event) => {
+    const pastedText = getPlainTextFromPasteEvent(event);
+    if (!pastedText) return;
+    event.preventDefault();
+
+    const target = event.target;
+    const selectionStart = target?.selectionStart;
+    const selectionEnd = target?.selectionEnd;
+
+    let nextCursor = null;
+    setForm((prev) => {
+      const currentValue = prev[field] ?? "";
+      const next = applyPasteToValue({
+        value: currentValue,
+        pasteText: pastedText,
+        selectionStart,
+        selectionEnd,
+      });
+      nextCursor = next.nextCursor;
+      return { ...prev, [field]: next.nextValue };
+    });
+
+    if (typeof nextCursor === "number" && target && "setSelectionRange" in target) {
+      requestAnimationFrame(() => {
+        target.setSelectionRange(nextCursor, nextCursor);
+      });
+    }
   };
 
   const handleSubmit = async (event) => {
@@ -133,6 +166,7 @@ const NotesBoard = ({ searchQuery = "" }) => {
           placeholder="Write your note..."
           value={form.content}
           onChange={handleChange("content")}
+          onPaste={handlePlainTextPaste("content")}
         />
         <button
           className="w-fit rounded-2xl bg-mint px-5 py-3 text-sm font-semibold text-ink shadow-glow transition hover:brightness-110 disabled:opacity-60"

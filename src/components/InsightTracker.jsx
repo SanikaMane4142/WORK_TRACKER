@@ -1,5 +1,9 @@
 import React, { useMemo, useState } from "react";
 import { updateTask } from "../services/supabaseClient";
+import {
+  applyPasteToValue,
+  getPlainTextFromPasteEvent,
+} from "../utils/plainTextPaste";
 
 const InsightTracker = ({ tasks = [], onSaved }) => {
   const [selectedId, setSelectedId] = useState("");
@@ -33,6 +37,34 @@ const InsightTracker = ({ tasks = [], onSaved }) => {
     } else {
       setStatus("Saved");
       onSaved?.();
+    }
+  };
+
+  const handlePlainTextPaste = (event) => {
+    const pastedText = getPlainTextFromPasteEvent(event);
+    if (!pastedText) return;
+    event.preventDefault();
+
+    const target = event.target;
+    const selectionStart = target?.selectionStart;
+    const selectionEnd = target?.selectionEnd;
+
+    let nextCursor = null;
+    setNotes((prev) => {
+      const next = applyPasteToValue({
+        value: prev ?? "",
+        pasteText: pastedText,
+        selectionStart,
+        selectionEnd,
+      });
+      nextCursor = next.nextCursor;
+      return next.nextValue;
+    });
+
+    if (typeof nextCursor === "number" && target && "setSelectionRange" in target) {
+      requestAnimationFrame(() => {
+        target.setSelectionRange(nextCursor, nextCursor);
+      });
     }
   };
 
@@ -98,6 +130,7 @@ const InsightTracker = ({ tasks = [], onSaved }) => {
         placeholder="Notes, insights, what worked well..."
         value={notes}
         onChange={(event) => setNotes(event.target.value)}
+        onPaste={handlePlainTextPaste}
       />
 
       <div className="flex flex-wrap items-center gap-3">

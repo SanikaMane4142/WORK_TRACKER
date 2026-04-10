@@ -8,6 +8,10 @@ import AnalyticsDashboard from "./AnalyticsDashboard.jsx";
 import ProjectNotes from "./ProjectNotes.jsx";
 import Expenses from "./Expenses.jsx";
 import {
+  applyPasteToValue,
+  getPlainTextFromPasteEvent,
+} from "../utils/plainTextPaste";
+import {
   fetchAllProjectNotes,
   fetchMistakes,
   fetchNotes,
@@ -27,7 +31,7 @@ const toolItems = [
   { label: "Analytics" },
 ];
 
-const Sidebar = ({ activeNav, onNavigate, onLogout }) => (
+const Sidebar = ({ activeNav, onNavigate, onLogout, onClose }) => (
   <aside className="flex h-full flex-col gap-6 rounded-2xl border border-slate-200 bg-white/80 p-6 shadow-card">
     <div className="flex items-center gap-3">
       <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-500 text-white shadow-glow">
@@ -47,7 +51,10 @@ const Sidebar = ({ activeNav, onNavigate, onLogout }) => (
         {navItems.map((label) => (
           <button
             key={label}
-            onClick={() => onNavigate(label)}
+            onClick={() => {
+              onNavigate(label);
+              onClose?.();
+            }}
             className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
               activeNav === label
                 ? "bg-indigo-50 text-indigo-600 shadow-sm"
@@ -69,7 +76,10 @@ const Sidebar = ({ activeNav, onNavigate, onLogout }) => (
         {toolItems.map((item) => (
           <button
             key={item.label}
-            onClick={() => onNavigate(item.label)}
+            onClick={() => {
+              onNavigate(item.label);
+              onClose?.();
+            }}
             className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
               activeNav === item.label
                 ? "bg-indigo-50 text-indigo-600 shadow-sm"
@@ -85,7 +95,10 @@ const Sidebar = ({ activeNav, onNavigate, onLogout }) => (
 
     <div className="mt-auto">
       <button
-        onClick={onLogout}
+        onClick={() => {
+          onLogout?.();
+          onClose?.();
+        }}
         className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-500 transition hover:bg-slate-50"
       >
         <span className="h-2 w-2 rounded-full bg-slate-300" />
@@ -105,9 +118,19 @@ const Header = ({
   searchValue,
   onSearchChange,
   onSmartSubmit,
+  onOpenSidebar,
 }) => (
   <header className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/70 p-4 shadow-card md:flex-row md:items-center md:justify-between">
     <div className="flex flex-1 items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm">
+      <button
+        type="button"
+        onClick={onOpenSidebar}
+        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 md:hidden"
+        aria-label="Open sidebar"
+        title="Menu"
+      >
+        <span className="text-lg leading-none">≡</span>
+      </button>
       <span className="text-slate-400">Search</span>
       <input
         type="text"
@@ -489,6 +512,35 @@ const MeetingsPage = ({ meetings, onAddMeeting, searchQuery = "" }) => {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
   };
 
+  const handlePlainTextPaste = (field) => (event) => {
+    const pastedText = getPlainTextFromPasteEvent(event);
+    if (!pastedText) return;
+    event.preventDefault();
+
+    const target = event.target;
+    const selectionStart = target?.selectionStart;
+    const selectionEnd = target?.selectionEnd;
+
+    let nextCursor = null;
+    setForm((prev) => {
+      const currentValue = prev[field] ?? "";
+      const next = applyPasteToValue({
+        value: currentValue,
+        pasteText: pastedText,
+        selectionStart,
+        selectionEnd,
+      });
+      nextCursor = next.nextCursor;
+      return { ...prev, [field]: next.nextValue };
+    });
+
+    if (typeof nextCursor === "number" && target && "setSelectionRange" in target) {
+      requestAnimationFrame(() => {
+        target.setSelectionRange(nextCursor, nextCursor);
+      });
+    }
+  };
+
   const handleSubmit = (event) => {
     event.preventDefault();
     if (!form.title.trim()) return;
@@ -583,6 +635,7 @@ const MeetingsPage = ({ meetings, onAddMeeting, searchQuery = "" }) => {
             placeholder="Notes"
             value={form.notes}
             onChange={handleChange("notes")}
+            onPaste={handlePlainTextPaste("notes")}
           />
           <button
             type="submit"
@@ -640,6 +693,23 @@ const Dashboard = ({
   const [showKickoff, setShowKickoff] = React.useState(true);
   const [tasksRefreshKey, setTasksRefreshKey] = React.useState(0);
   const [expensesRefreshKey, setExpensesRefreshKey] = React.useState(0);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false);
+  const SIDEBAR_WIDTH_STORAGE_KEY = "dashboardSidebarWidth.v1";
+  const SIDEBAR_MIN_WIDTH = 220;
+  const SIDEBAR_MAX_WIDTH = 420;
+  const [sidebarWidth, setSidebarWidth] = React.useState(() => {
+    try {
+      const raw = localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
+      const num = Number(raw);
+      if (Number.isFinite(num)) {
+        return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, num));
+      }
+    } catch {
+      // ignore
+    }
+    return 260;
+  });
+  const sidebarResizingRef = React.useRef(null);
   const logDateSet = React.useMemo(
     () => new Set((logs || []).map((log) => log.log_date)),
     [logs]
@@ -676,6 +746,69 @@ const Dashboard = ({
     const options = messages[timeOfDay];
     return options[seed % options.length];
   }, [today]);
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
+    } catch {
+      // ignore
+    }
+  }, [sidebarWidth]);
+
+  React.useEffect(() => {
+    if (!isMobileSidebarOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isMobileSidebarOpen]);
+
+  React.useEffect(() => {
+    if (!isMobileSidebarOpen) return;
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") setIsMobileSidebarOpen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMobileSidebarOpen]);
+
+  React.useEffect(() => {
+    const handleMouseMove = (event) => {
+      const resizing = sidebarResizingRef.current;
+      if (!resizing) return;
+      const delta = event.clientX - resizing.startX;
+      const next = resizing.startWidth + delta;
+      const clamped = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, next));
+      setSidebarWidth(clamped);
+    };
+
+    const handleMouseUp = () => {
+      if (!sidebarResizingRef.current) return;
+      sidebarResizingRef.current = null;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, []);
+
+  const startSidebarResize = (event) => {
+    event.preventDefault();
+    sidebarResizingRef.current = {
+      startX: event.clientX,
+      startWidth: sidebarWidth,
+    };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  };
 
   const todayKey = formatDate(today);
   const todaysSummary = React.useMemo(() => {
@@ -1463,7 +1596,7 @@ const Dashboard = ({
   };
 
   return (
-    <div className="min-h-screen px-5 py-8 lg:px-10">
+    <div className="mx-auto min-h-screen max-w-[1440px] px-5 py-8 lg:px-10">
       {showKickoff && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 px-4">
           <div className="w-full max-w-3xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
@@ -1557,12 +1690,30 @@ const Dashboard = ({
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
-        <Sidebar
-          activeNav={activeNav}
-          onNavigate={setActiveNav}
-          onLogout={onLocalSignOut}
-        />
+      <div
+        className="grid gap-6 md:relative md:items-start md:[grid-template-columns:var(--sidebar-width)_1fr]"
+        style={{
+          "--sidebar-width": `${sidebarWidth}px`,
+        }}
+      >
+        <div className="relative hidden md:block md:sticky md:top-8 md:self-start md:max-h-[calc(100vh-4rem)] md:overflow-auto">
+          <Sidebar
+            activeNav={activeNav}
+            onNavigate={setActiveNav}
+            onLogout={onLocalSignOut}
+          />
+          <div
+            className="col-resize-handle hidden md:flex"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize sidebar"
+            title="Drag to resize"
+            onMouseDown={startSidebarResize}
+            style={{
+              right: "-8px",
+            }}
+          />
+        </div>
         <main className="space-y-6">
           <Header
             session={session}
@@ -1574,10 +1725,41 @@ const Dashboard = ({
             searchValue={searchQuery}
             onSearchChange={setSearchQuery}
             onSmartSubmit={handleSmartSubmit}
+            onOpenSidebar={() => setIsMobileSidebarOpen(true)}
           />
           {renderSection()}
         </main>
       </div>
+
+      {isMobileSidebarOpen && (
+        <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true">
+          <button
+            type="button"
+            className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px]"
+            aria-label="Close sidebar"
+            onClick={() => setIsMobileSidebarOpen(false)}
+          />
+          <div className="absolute left-0 top-0 h-full w-[320px] max-w-[85vw] p-4">
+            <div className="relative h-full">
+              <button
+                type="button"
+                onClick={() => setIsMobileSidebarOpen(false)}
+                className="absolute right-3 top-3 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50"
+                aria-label="Close"
+                title="Close"
+              >
+                <span className="text-lg leading-none">×</span>
+              </button>
+              <Sidebar
+                activeNav={activeNav}
+                onNavigate={setActiveNav}
+                onLogout={onLocalSignOut}
+                onClose={() => setIsMobileSidebarOpen(false)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -4,6 +4,10 @@ import {
   fetchWorkLogs,
   upsertWorkLog,
 } from "../services/supabaseClient";
+import {
+  applyPasteToValue,
+  getPlainTextFromPasteEvent,
+} from "../utils/plainTextPaste";
 
 const todayString = () => new Date().toISOString().split("T")[0];
 const tomorrowString = () => {
@@ -166,6 +170,35 @@ const WorkLog = ({
     setForm((prev) => ({ ...prev, [field]: value }));
     if (field === "log_date") {
       onDateChange?.(value);
+    }
+  };
+
+  const handlePlainTextPaste = (field) => (event) => {
+    const pastedText = getPlainTextFromPasteEvent(event);
+    if (!pastedText) return;
+    event.preventDefault();
+
+    const target = event.target;
+    const selectionStart = target?.selectionStart;
+    const selectionEnd = target?.selectionEnd;
+
+    let nextCursor = null;
+    setForm((prev) => {
+      const currentValue = prev[field] ?? "";
+      const next = applyPasteToValue({
+        value: currentValue,
+        pasteText: pastedText,
+        selectionStart,
+        selectionEnd,
+      });
+      nextCursor = next.nextCursor;
+      return { ...prev, [field]: next.nextValue };
+    });
+
+    if (typeof nextCursor === "number" && target && "setSelectionRange" in target) {
+      requestAnimationFrame(() => {
+        target.setSelectionRange(nextCursor, nextCursor);
+      });
     }
   };
 
@@ -376,6 +409,7 @@ const WorkLog = ({
             className="w-full rounded-2xl bg-white/10 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-ocean disabled:opacity-50"
             value={form.tasks_planned}
             onChange={handleChange("tasks_planned")}
+            onPaste={handlePlainTextPaste("tasks_planned")}
             disabled={isFrozen}
           />
         </label>
@@ -386,6 +420,7 @@ const WorkLog = ({
             className="w-full rounded-2xl bg-white/10 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-ocean disabled:opacity-50"
             value={form.tasks_completed}
             onChange={handleChange("tasks_completed")}
+            onPaste={handlePlainTextPaste("tasks_completed")}
             disabled={isFrozen}
           />
         </label>
@@ -396,6 +431,7 @@ const WorkLog = ({
             className="w-full rounded-2xl bg-white/10 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-ocean disabled:opacity-50"
             value={form.wip}
             onChange={handleChange("wip")}
+            onPaste={handlePlainTextPaste("wip")}
             disabled={isFrozen}
           />
         </label>
@@ -406,6 +442,7 @@ const WorkLog = ({
             className="w-full rounded-2xl bg-white/10 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-ocean disabled:opacity-50"
             value={form.blockers}
             onChange={handleChange("blockers")}
+            onPaste={handlePlainTextPaste("blockers")}
             disabled={isFrozen}
           />
         </label>
@@ -416,6 +453,7 @@ const WorkLog = ({
             className="w-full rounded-2xl bg-white/10 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-ocean disabled:opacity-50"
             value={form.learnings}
             onChange={handleChange("learnings")}
+            onPaste={handlePlainTextPaste("learnings")}
             disabled={isFrozen}
           />
         </label>
@@ -426,6 +464,7 @@ const WorkLog = ({
             className="w-full rounded-2xl bg-white/10 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-ocean disabled:opacity-50"
             value={form.insights}
             onChange={handleChange("insights")}
+            onPaste={handlePlainTextPaste("insights")}
             disabled={isFrozen}
           />
         </label>
@@ -448,6 +487,7 @@ const WorkLog = ({
             className="w-full rounded-2xl bg-white/10 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-ocean disabled:opacity-50"
             value={form.tomorrow}
             onChange={handleChange("tomorrow")}
+            onPaste={handlePlainTextPaste("tomorrow")}
             disabled={isFrozen}
           />
         </label>
@@ -458,6 +498,7 @@ const WorkLog = ({
             className="w-full rounded-2xl bg-white/10 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-ocean disabled:opacity-50"
             value={form.notes}
             onChange={handleChange("notes")}
+            onPaste={handlePlainTextPaste("notes")}
             disabled={isFrozen}
           />
         </label>
