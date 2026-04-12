@@ -87,15 +87,15 @@ const App = () => {
 
   if (!localAuthed) {
     return (
-      <div className="min-h-screen bg-slate-100 px-6 py-10">
+      <div className="min-h-screen bg-transparent px-6 py-10">
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="absolute -top-20 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-sky-200/60 blur-3xl" />
           <div className="absolute bottom-0 right-0 h-72 w-72 rounded-full bg-teal-200/50 blur-3xl" />
         </div>
-        <div className="relative mx-auto flex min-h-[80vh] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-xl md:flex-row">
+        <div className="relative mx-auto flex min-h-[80vh] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white/80 shadow-xl md:flex-row">
           <section className="flex flex-1 flex-col justify-between gap-10 p-8 text-slate-900 md:p-12">
             <div className="space-y-5">
-              <div className="inline-flex items-center gap-3 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-500">
+              <div className="inline-flex items-center gap-3 rounded-full border border-slate-200 bg-white/20 px-4 py-2 text-xs text-slate-500">
                 <span className="h-2 w-2 rounded-full bg-ocean" />
                 Personal work tracker
               </div>
@@ -108,7 +108,7 @@ const App = () => {
                 </p>
               </div>
             </div>
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-2">
+            <div className="rounded-3xl border border-slate-200 bg-white/20 p-2">
               <div className="overflow-hidden rounded-2xl">
                 <img
                   src="/smart-task-card.svg"
@@ -118,16 +118,16 @@ const App = () => {
               </div>
             </div>
             <div className="grid gap-4 text-sm text-slate-500">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="rounded-2xl border border-slate-200 bg-white/20 p-4">
                 Weekly analytics, task focus, and notes in one place.
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="rounded-2xl border border-slate-200 bg-white/20 p-4">
                 Secure personal login for a single owner dashboard.
               </div>
             </div>
           </section>
 
-          <section className="flex flex-1 items-center justify-center border-t border-slate-200 bg-slate-50 p-8 md:border-l md:border-t-0 md:p-12">
+          <section className="flex flex-1 items-center justify-center border-t border-slate-200 bg-white/20 p-8 md:border-l md:border-t-0 md:p-12">
             <div className="w-full max-w-sm space-y-6">
               <div className="space-y-2 text-slate-900">
                 <p className="text-xs uppercase tracking-[0.3em] text-slate-400">

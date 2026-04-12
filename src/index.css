@@ -8,7 +8,21 @@
   --cute-card: rgba(255, 255, 255, 0.88);
   --cute-border: rgba(226, 232, 240, 0.85);
   --cute-text: #0f172a;
+  --text-strong: #0f172a;
+  --text-normal: #1e293b;
+  --text-muted: #334155;
   --cute-shadow: 0 18px 55px rgba(15, 23, 42, 0.08);
+  --glass-blur: 18px;
+  --glass-saturate: 1.35;
+  --glass-brightness: 1.05;
+  --glass-shadow: 0 20px 70px rgba(15, 23, 42, 0.1);
+  --glass-shadow-hover: 0 26px 88px rgba(15, 23, 42, 0.14);
+  --glass-border: rgba(226, 232, 240, 0.72);
+  --glass-border-hover: rgba(148, 163, 184, 0.7);
+  --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-fast: 160ms;
+  --motion-med: 240ms;
+  --motion-slow: 420ms;
 }
 
 body {
@@ -22,11 +36,71 @@ body {
   color: var(--cute-text);
 }
 
+input,
+textarea,
+select {
+  color: var(--text-normal);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: rgba(51, 65, 85, 0.78) !important;
+  opacity: 1;
+}
+
+input.bg-white\/10,
+textarea.bg-white\/10,
+select.bg-white\/10 {
+  background-color: rgba(226, 232, 240, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.32);
+}
+
+@layer base {
+  :where(button, a, input, textarea, select) {
+    transition-property: color, background-color, border-color, box-shadow, transform, filter, opacity,
+      -webkit-backdrop-filter, backdrop-filter;
+    transition-duration: var(--motion-fast);
+    transition-timing-function: var(--motion-ease);
+  }
+
+  ::selection {
+    background: rgba(139, 92, 246, 0.22);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html:focus-within {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
 .card {
   background: var(--cute-card);
-  border: 1px solid var(--cute-border);
-  box-shadow: var(--cute-shadow);
-  @apply rounded-2xl backdrop-blur;
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  @apply rounded-2xl;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate))
+    brightness(var(--glass-brightness));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) brightness(var(--glass-brightness));
+  transition:
+    transform var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-med) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    background-color var(--motion-fast) var(--motion-ease);
+}
+
+.card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--glass-shadow-hover);
+  border-color: var(--glass-border-hover);
 }
 
 .section-title {
@@ -45,35 +119,73 @@ body {
 
 /* Legacy dark utility compatibility for existing components */
 .text-white {
-  color: #0f172a;
+  color: var(--text-strong);
 }
 .text-white\/80 {
-  color: rgba(15, 23, 42, 0.8);
+  color: rgba(15, 23, 42, 0.92);
 }
 .text-white\/70 {
-  color: rgba(15, 23, 42, 0.7);
+  color: rgba(15, 23, 42, 0.86);
 }
 .text-white\/60 {
-  color: rgba(15, 23, 42, 0.6);
+  color: rgba(15, 23, 42, 0.8);
 }
 .text-white\/50 {
-  color: rgba(15, 23, 42, 0.5);
+  color: rgba(15, 23, 42, 0.74);
 }
 .text-white\/40 {
-  color: rgba(15, 23, 42, 0.4);
+  color: rgba(15, 23, 42, 0.65);
+}
+
+/* Improve readability for Tailwind slate text utilities used throughout pages */
+.text-slate-900 {
+  color: var(--text-strong);
+}
+.text-slate-800,
+.text-slate-700,
+.text-slate-600 {
+  color: var(--text-normal);
+}
+.text-slate-500,
+.text-slate-400 {
+  color: var(--text-muted);
 }
 
 .bg-white\/5 {
   background-color: rgba(255, 255, 255, 0.85);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate))
+    brightness(var(--glass-brightness));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) brightness(var(--glass-brightness));
 }
 .bg-white\/10 {
   background-color: rgba(238, 242, 255, 0.72);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate))
+    brightness(var(--glass-brightness));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) brightness(var(--glass-brightness));
 }
 .bg-white\/20 {
   background-color: rgba(224, 231, 255, 0.7);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate))
+    brightness(var(--glass-brightness));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) brightness(var(--glass-brightness));
 }
 .bg-white\/30 {
   background-color: rgba(199, 210, 254, 0.7);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate))
+    brightness(var(--glass-brightness));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) brightness(var(--glass-brightness));
+}
+.bg-white\/70 {
+  background-color: rgba(255, 255, 255, 0.66);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate))
+    brightness(var(--glass-brightness));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) brightness(var(--glass-brightness));
+}
+.bg-white\/80 {
+  background-color: rgba(255, 255, 255, 0.74);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate))
+    brightness(var(--glass-brightness));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) brightness(var(--glass-brightness));
 }
 .bg-white {
   background-color: #ffffff;
@@ -90,7 +202,11 @@ body {
 }
 
 .placeholder\:text-white\/50::placeholder {
-  color: rgba(15, 23, 42, 0.45);
+  color: rgba(15, 23, 42, 0.62);
+}
+
+.placeholder\:text-slate-400::placeholder {
+  color: rgba(51, 65, 85, 0.78);
 }
 
 .project-note-markdown {
@@ -157,4 +273,76 @@ body {
   font-size: 10px;
   line-height: 1;
   pointer-events: none;
+}
+
+.shadow-card,
+.shadow-glow {
+  transition:
+    box-shadow var(--motion-med) var(--motion-ease),
+    transform var(--motion-fast) var(--motion-ease),
+    filter var(--motion-fast) var(--motion-ease);
+}
+
+.cute-dropdown-trigger {
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background-image: linear-gradient(to right, transparent calc(100% - 2.6rem), rgba(255, 255, 255, 0.24) calc(100% - 2.6rem));
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  transition:
+    box-shadow var(--motion-med) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    transform var(--motion-fast) var(--motion-ease),
+    background-color var(--motion-fast) var(--motion-ease);
+}
+
+.cute-dropdown-trigger:hover {
+  border-color: rgba(99, 102, 241, 0.42);
+  box-shadow: 0 14px 28px rgba(79, 70, 229, 0.15);
+  transform: translateY(-1px);
+}
+
+.cute-dropdown-trigger:focus {
+  border-color: rgba(56, 189, 248, 0.58);
+}
+
+.cute-dropdown-menu {
+  animation: cute-pop-in 180ms var(--motion-ease);
+  transform-origin: top center;
+}
+
+.cute-dropdown-item {
+  transition:
+    background-color var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease),
+    transform var(--motion-fast) var(--motion-ease);
+}
+
+.cute-dropdown-item:hover {
+  background-color: rgba(186, 230, 253, 0.72);
+  color: #0f172a;
+  transform: translateX(2px);
+}
+
+@keyframes cute-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .card,
+  .bg-white\/5,
+  .bg-white\/10,
+  .bg-white\/20,
+  .bg-white\/30,
+  .bg-white\/70,
+  .bg-white\/80 {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background-color: rgba(255, 255, 255, 0.92);
+  }
 }
