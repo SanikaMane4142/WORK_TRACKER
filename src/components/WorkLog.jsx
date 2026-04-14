@@ -15,6 +15,7 @@ const tomorrowString = () => {
   date.setDate(date.getDate() + 1);
   return date.toISOString().split("T")[0];
 };
+const LOCAL_LOGS_STORAGE_KEY = "worklogEntries.v1";
 
 const formatLogText = (log) => {
   const lines = [
@@ -82,6 +83,51 @@ const WorkLog = ({
     rating: normalizeNumber(currentForm.rating),
     hours: normalizeNumber(currentForm.hours),
   });
+  const readLocalLogs = () => {
+    try {
+      const raw = localStorage.getItem(LOCAL_LOGS_STORAGE_KEY);
+      const parsed = JSON.parse(raw || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+  const writeLocalLogs = (items) => {
+    try {
+      localStorage.setItem(LOCAL_LOGS_STORAGE_KEY, JSON.stringify(items));
+    } catch {
+      // ignore write failures
+    }
+  };
+  const sortLogsByDateDesc = (items) =>
+    [...items].sort((a, b) => String(b?.log_date || "").localeCompare(String(a?.log_date || "")));
+  const applyDateFilter = (items) =>
+    items.filter((item) => {
+      const date = String(item?.log_date || "");
+      if (!date) return false;
+      if (filterFrom && date < filterFrom) return false;
+      if (filterTo && date > filterTo) return false;
+      return true;
+    });
+  const mergeLogsByDate = (primary = [], secondary = []) => {
+    const byDate = new Map();
+    [...secondary, ...primary].forEach((entry) => {
+      const date = entry?.log_date;
+      if (!date) return;
+      byDate.set(date, entry);
+    });
+    return sortLogsByDateDesc(Array.from(byDate.values()));
+  };
+  const upsertLocalLog = (payload) => {
+    const existing = readLocalLogs();
+    const next = [...existing];
+    const idx = next.findIndex((entry) => entry?.log_date === payload.log_date);
+    if (idx >= 0) next[idx] = { ...next[idx], ...payload };
+    else next.push(payload);
+    const sorted = sortLogsByDateDesc(next);
+    writeLocalLogs(sorted);
+    return sorted;
+  };
 
   const loadLogs = async () => {
     const { data, error: loadError } = await fetchWorkLogs({
@@ -91,11 +137,22 @@ const WorkLog = ({
     if (loadError) {
       const message = explainSupabaseError(loadError);
       console.error("Load logs error:", loadError);
-      setError(message || "Unable to load logs. Check Supabase permissions.");
+      const fallback = applyDateFilter(sortLogsByDateDesc(readLocalLogs()));
+      setLogs(fallback);
+      onLogsUpdate?.(fallback);
+      setError(
+        fallback.length > 0
+          ? `Supabase unavailable. Showing locally saved logs. ${message || ""}`.trim()
+          : (message || "Unable to load logs. Check Supabase permissions.")
+      );
+      setStatus(fallback.length > 0 ? "Offline" : "Error");
       return;
     }
-    setLogs(data || []);
-    onLogsUpdate?.(data || []);
+    const merged = mergeLogsByDate(data || [], readLocalLogs());
+    writeLocalLogs(merged);
+    const filtered = applyDateFilter(merged);
+    setLogs(filtered);
+    onLogsUpdate?.(filtered);
   };
 
   useEffect(() => {
@@ -134,6 +191,11 @@ const WorkLog = ({
 
         isSavingRef.current = true;
         setStatus("Saving...");
+        const localLogs = upsertLocalLog(latestPayloadRef.current);
+        const localFiltered = applyDateFilter(localLogs);
+        setLogs(localFiltered);
+        onLogsUpdate?.(localFiltered);
+
         const { error: saveError } = await upsertWorkLog(
           latestPayloadRef.current
         );
@@ -141,8 +203,13 @@ const WorkLog = ({
         if (saveError) {
           const message = explainSupabaseError(saveError);
           console.error("Auto-save error:", saveError);
-          setError(message || "Auto-save failed. Please check your connection.");
-          setStatus("Error");
+          setError(
+            `Saved locally. ${message || "Cloud sync failed. Please check your connection."}`.trim()
+          );
+          setStatus("Saved locally");
+          lastSavedHashRef.current = JSON.stringify(
+            latestPayloadRef.current
+          );
         } else {
           setError("");
           setStatus("Saved");
@@ -228,9 +295,18 @@ const WorkLog = ({
     if (loadError) {
       const message = explainSupabaseError(loadError);
       console.error("Load log error:", loadError);
-      setError(message || "Unable to load log for that date.");
-      setStatus("Error");
-      hydrateFormForDate(date);
+      const localLog = readLocalLogs().find((entry) => entry?.log_date === date);
+      if (localLog) {
+        hydrateFormForDate(date, localLog);
+        setError(
+          `Supabase unavailable. Showing local log for ${date}. ${message || ""}`.trim()
+        );
+        setStatus("Offline");
+      } else {
+        setError(message || "Unable to load log for that date.");
+        setStatus("Error");
+        hydrateFormForDate(date);
+      }
     } else {
       setError("");
       hydrateFormForDate(date, data?.[0] || null);
@@ -256,14 +332,16 @@ const WorkLog = ({
     }
 
     setStatus("Saving...");
+    upsertLocalLog(buildPayload(form));
     const { error: saveError } = await upsertWorkLog(buildPayload(form));
 
     if (saveError) {
       const message = explainSupabaseError(saveError);
       console.error("Freeze error:", saveError);
-      setError(message || "Freeze failed. Please check your connection.");
-      setStatus("Error");
-      return;
+      setError(
+        `Saved locally and frozen. ${message || "Cloud sync failed. Please check your connection."}`.trim()
+      );
+      setStatus("Saved locally");
     }
 
     const next = { ...frozenDates, [form.log_date]: true };
