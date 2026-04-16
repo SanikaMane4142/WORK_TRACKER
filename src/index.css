@@ -1,3 +1,9 @@
+/* Ensure bold text in markdown is visible */
+.project-note-markdown strong,
+.project-note-markdown b {
+  color: #7c3aed !important;
+  font-weight: bold;
+}
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -345,9 +351,4 @@ select.bg-white\/10 {
     backdrop-filter: none;
     background-color: rgba(255, 255, 255, 0.92);
   }
-}
-
-/* Add bold styling for note titles */
-.note-title {
-    font-weight: bold;
 }
