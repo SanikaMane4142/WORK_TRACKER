@@ -346,3 +346,8 @@ select.bg-white\/10 {
     background-color: rgba(255, 255, 255, 0.92);
   }
 }
+
+/* Add bold styling for note titles */
+.note-title {
+    font-weight: bold;
+}

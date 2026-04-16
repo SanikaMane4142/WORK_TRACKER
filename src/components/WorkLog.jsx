@@ -377,7 +377,8 @@ const WorkLog = ({
     URL.revokeObjectURL(url);
   };
 
-  const expandedByDefault = useMemo(() => new Set([form.log_date]), [form.log_date]);
+  // Collapse all logs by default
+  const expandedByDefault = useMemo(() => new Set(), []);
 
   const filteredLogs = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -402,6 +403,8 @@ const WorkLog = ({
       return haystack.includes(query);
     });
   }, [logs, searchQuery]);
+
+  const [showHistory, setShowHistory] = useState(false);
 
   return (
     <section className="card p-6 md:p-8 space-y-6 animate-floatIn">
@@ -585,70 +588,82 @@ const WorkLog = ({
       {error && <p className="text-sm text-rose-300">{error}</p>}
 
       <div className="space-y-4">
-        <h3 className="font-display text-lg">History</h3>
-        {filteredLogs.length === 0 && (
-          <p className="text-sm text-white/60">No logs yet.</p>
+        <div className="flex items-center justify-between">
+          <h3 className="font-display text-lg">History</h3>
+          <button
+            className="rounded-full border border-white/20 px-4 py-2 text-xs text-white transition hover:border-white/60"
+            onClick={() => setShowHistory((prev) => !prev)}
+          >
+            {showHistory ? "Hide History" : "Show History"}
+          </button>
+        </div>
+        {showHistory && (
+          <>
+            {filteredLogs.length === 0 && (
+              <p className="text-sm text-white/60">No logs yet.</p>
+            )}
+            {filteredLogs.map((log, index) => {
+              const openByDefault = expandedByDefault.has(log.log_date);
+              return (
+                <details
+                  key={log.id || log.log_date || `log-${index}`}
+                  className="rounded-2xl border border-white/10 bg-white/5 p-4"
+                  open={openByDefault}
+                >
+                  <summary className="flex cursor-pointer items-center justify-between gap-4 text-sm text-white/80">
+                    <span>{log.log_date}</span>
+                    <span className="text-xs text-white/50">
+                      Rating {log.rating || "-"}
+                    </span>
+                  </summary>
+                  <div className="mt-4 grid gap-3 text-sm text-white/70">
+                    <p>
+                      <span className="text-white/50">Hours:</span> {log.hours || "-"}
+                    </p>
+                    <p>
+                      <span className="text-white/50">Planned:</span> {log.tasks_planned || "-"}
+                    </p>
+                    <p>
+                      <span className="text-white/50">Completed:</span> {log.tasks_completed || "-"}
+                    </p>
+                    <p>
+                      <span className="text-white/50">WIP:</span> {log.wip || "-"}
+                    </p>
+                    <p>
+                      <span className="text-white/50">Blockers:</span> {log.blockers || "-"}
+                    </p>
+                    <p>
+                      <span className="text-white/50">Learnings:</span> {log.learnings || "-"}
+                    </p>
+                    <p>
+                      <span className="text-white/50">Insights:</span> {log.insights || "-"}
+                    </p>
+                    <p>
+                      <span className="text-white/50">Tomorrow:</span> {log.tomorrow || "-"}
+                    </p>
+                    <p>
+                      <span className="text-white/50">Notes:</span> {log.notes || "-"}
+                    </p>
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      <button
+                        onClick={() => copyLog(log)}
+                        className="rounded-full border border-white/20 px-4 py-2 text-xs text-white transition hover:border-white/60"
+                      >
+                        Copy log
+                      </button>
+                      <button
+                        onClick={() => downloadLog(log)}
+                        className="rounded-full border border-white/20 px-4 py-2 text-xs text-white transition hover:border-white/60"
+                      >
+                        Download
+                      </button>
+                    </div>
+                  </div>
+                </details>
+              );
+            })}
+          </>
         )}
-        {filteredLogs.map((log, index) => {
-          const openByDefault = expandedByDefault.has(log.log_date);
-          return (
-            <details
-              key={log.id || log.log_date || `log-${index}`}
-              className="rounded-2xl border border-white/10 bg-white/5 p-4"
-              open={openByDefault}
-            >
-              <summary className="flex cursor-pointer items-center justify-between gap-4 text-sm text-white/80">
-                <span>{log.log_date}</span>
-                <span className="text-xs text-white/50">
-                  Rating {log.rating || "-"}
-                </span>
-              </summary>
-              <div className="mt-4 grid gap-3 text-sm text-white/70">
-                <p>
-                  <span className="text-white/50">Hours:</span> {log.hours || "-"}
-                </p>
-                <p>
-                  <span className="text-white/50">Planned:</span> {log.tasks_planned || "-"}
-                </p>
-                <p>
-                  <span className="text-white/50">Completed:</span> {log.tasks_completed || "-"}
-                </p>
-                <p>
-                  <span className="text-white/50">WIP:</span> {log.wip || "-"}
-                </p>
-                <p>
-                  <span className="text-white/50">Blockers:</span> {log.blockers || "-"}
-                </p>
-                <p>
-                  <span className="text-white/50">Learnings:</span> {log.learnings || "-"}
-                </p>
-                <p>
-                  <span className="text-white/50">Insights:</span> {log.insights || "-"}
-                </p>
-                <p>
-                  <span className="text-white/50">Tomorrow:</span> {log.tomorrow || "-"}
-                </p>
-                <p>
-                  <span className="text-white/50">Notes:</span> {log.notes || "-"}
-                </p>
-                <div className="flex flex-wrap gap-2 pt-2">
-                  <button
-                    onClick={() => copyLog(log)}
-                    className="rounded-full border border-white/20 px-4 py-2 text-xs text-white transition hover:border-white/60"
-                  >
-                    Copy log
-                  </button>
-                  <button
-                    onClick={() => downloadLog(log)}
-                    className="rounded-full border border-white/20 px-4 py-2 text-xs text-white transition hover:border-white/60"
-                  >
-                    Download
-                  </button>
-                </div>
-              </div>
-            </details>
-          );
-        })}
       </div>
     </section>
   );

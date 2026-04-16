@@ -530,6 +530,37 @@ const ProjectNotes = () => {
             value={noteForm.content}
             onChange={handleNoteChange("content")}
             onPaste={handlePlainTextPaste("content")}
+            onKeyDown={(e) => {
+              if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+                e.preventDefault();
+                const textarea = e.target;
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const value = noteForm.content;
+                const selected = value.substring(start, end);
+                const before = value.substring(0, start);
+                const after = value.substring(end);
+                // If already bold, remove bold
+                const isBold = selected.startsWith('**') && selected.endsWith('**');
+                let newText;
+                let cursorOffset = 2;
+                if (isBold) {
+                  newText = before + selected.slice(2, -2) + after;
+                  cursorOffset = 0;
+                } else {
+                  newText = before + '**' + selected + '**' + after;
+                }
+                setNoteForm((prev) => ({ ...prev, content: newText }));
+                setTimeout(() => {
+                  textarea.focus();
+                  if (isBold) {
+                    textarea.setSelectionRange(start, end - 4);
+                  } else {
+                    textarea.setSelectionRange(start + 2, end + 2);
+                  }
+                }, 0);
+              }
+            }}
           />
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -623,77 +654,213 @@ const ProjectNotes = () => {
           )}
           {filteredNotes.map((note) => {
             const photoItems = normalizePhotoItems(note);
+            const isEditing = editingNoteId === note.id;
             return (
               <div
                 key={note.id}
                 className="rounded-2xl border border-white/10 bg-white/5 p-4"
               >
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <h3 className="font-display text-lg">
-                    {note.title || "Project note"}
-                  </h3>
-                  <p className="text-xs text-white/40">
-                    {new Date(note.created_at).toLocaleString("en-US")}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => handleEditNote(note)}
-                    className="w-fit rounded-full border border-white/20 px-4 py-2 text-xs text-white transition hover:border-white/60"
+                {isEditing ? (
+                  <form
+                    onSubmit={handleAddNote}
+                    className="grid gap-4"
                   >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() =>
-                      deleteProjectNote(note.id).then(() =>
-                        loadNotes(selectedProject?.id)
-                      )
-                    }
-                    className="w-fit rounded-full border border-rose-400/50 px-4 py-2 text-xs text-rose-200 transition hover:border-rose-300"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-              {note.changed_files && (
-                <p className="mt-3 text-xs text-white/50">
-                  Files changed: {note.changed_files}
-                </p>
-              )}
-              {note.content && (
-                <div className="mt-3 project-note-markdown">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {formatNoteContent(note.content)}
-                  </ReactMarkdown>
-                </div>
-              )}
-              {photoItems.length > 0 && (
-                <div className="mt-3 space-y-3">
-                  {photoItems.map((photo, index) => (
-                    <div key={`${note.id}-photo-${index}`} className="space-y-2">
-                      {photo.url && (
-                        <div className="h-24 w-24 overflow-hidden rounded-2xl border border-white/10">
-                          <img
-                            src={photo.url}
-                            alt="Project note"
-                            className="h-full w-full object-cover"
-                            onClick={() => setPreviewUrl(photo.url)}
+                    <input
+                      className="rounded-full bg-gray-100 px-4 py-3 text-sm text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      placeholder="Title (optional)"
+                      value={noteForm.title}
+                      onChange={handleNoteChange("title")}
+                    />
+                    <textarea
+                      rows="12"
+                      className="rounded-2xl bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-ocean min-h-[200px]"
+                      placeholder="Important notes for this project..."
+                      value={noteForm.content}
+                      onChange={handleNoteChange("content")}
+                      onPaste={handlePlainTextPaste("content")}
+                      onKeyDown={(e) => {
+                        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+                          e.preventDefault();
+                          const textarea = e.target;
+                          const start = textarea.selectionStart;
+                          const end = textarea.selectionEnd;
+                          const value = noteForm.content;
+                          const selected = value.substring(start, end);
+                          const before = value.substring(0, start);
+                          const after = value.substring(end);
+                          // If already bold, remove bold
+                          const isBold = selected.startsWith('**') && selected.endsWith('**');
+                          let newText;
+                          let cursorOffset = 2;
+                          if (isBold) {
+                            newText = before + selected.slice(2, -2) + after;
+                            cursorOffset = 0;
+                          } else {
+                            newText = before + '**' + selected + '**' + after;
+                          }
+                          setNoteForm((prev) => ({ ...prev, content: newText }));
+                          setTimeout(() => {
+                            textarea.focus();
+                            if (isBold) {
+                              textarea.setSelectionRange(start, end - 4);
+                            } else {
+                              textarea.setSelectionRange(start + 2, end + 2);
+                            }
+                          }, 0);
+                        }
+                      }}
+                    />
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs text-white/60">
+                          Photos with descriptions (up to {MAX_PHOTOS})
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleAddPhoto}
+                          className="rounded-full border border-white/20 px-3 py-1 text-[11px] text-white transition hover:border-white/60"
+                        >
+                          Add photo
+                        </button>
+                      </div>
+                      {noteForm.photos.map((photo) => (
+                        <div
+                          key={photo.id}
+                          className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3"
+                        >
+                          <div className="flex items-center justify-between text-xs text-white/60">
+                            <span>Photo</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePhoto(photo.id)}
+                              className="rounded-full border border-white/20 px-3 py-1 text-[11px] text-white transition hover:border-white/60"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handlePhotoFileSelect(photo.id)}
+                            className="rounded-2xl bg-white/10 px-4 py-3 text-sm text-white file:mr-4 file:rounded-full file:border-0 file:bg-white/20 file:px-4 file:py-2 file:text-xs file:text-white/80"
+                          />
+                          {(photo.preview || photo.url) && (
+                            <div className="relative h-32 w-32 overflow-hidden rounded-2xl border border-white/10">
+                              <img
+                                src={photo.preview || photo.url}
+                                alt="Project note"
+                                className="h-full w-full object-cover"
+                                onClick={() => setPreviewUrl(photo.preview || photo.url)}
+                              />
+                            </div>
+                          )}
+                          <input
+                            className="rounded-2xl bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-ocean"
+                            placeholder="Description for this photo"
+                            value={photo.description}
+                            onChange={handlePhotoDescriptionChange(photo.id)}
                           />
                         </div>
-                      )}
-                      {photo.description && (
-                        <p className="text-xs text-white/60">{photo.description}</p>
-                      )}
+                      ))}
                     </div>
-                  ))}
-                </div>
-              )}
-              {note.important && (
-                <span className="mt-3 inline-flex rounded-full bg-rose-500/20 px-3 py-1 text-xs text-rose-200">
-                  Important
-                </span>
-              )}
+                    <textarea
+                      rows="2"
+                      className="rounded-2xl bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-ocean"
+                      placeholder="Files/folders changed today (optional)"
+                      value={noteForm.changedFiles}
+                      onChange={handleNoteChange("changedFiles")}
+                      onPaste={handlePlainTextPaste("changedFiles")}
+                    />
+                    <label className="flex items-center gap-2 rounded-2xl bg-white/5 px-4 py-3 text-sm text-white/70">
+                      <input
+                        type="checkbox"
+                        checked={noteForm.important}
+                        onChange={handleNoteChange("important")}
+                        className="h-4 w-4 rounded border-white/30 bg-white/10"
+                      />
+                      Mark as important
+                    </label>
+                    <button className="w-fit rounded-2xl bg-mint px-5 py-3 text-sm font-semibold text-ink shadow-glow transition hover:brightness-110">
+                      Update project note
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="w-fit rounded-2xl border border-white/20 px-5 py-3 text-sm text-white transition hover:border-white/60"
+                    >
+                      Cancel edit
+                    </button>
+                  </form>
+                ) : (
+                  <>
+                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <h3 className="font-display text-lg">
+                          {note.title || "Project note"}
+                        </h3>
+                        <p className="text-xs text-white/40">
+                          {new Date(note.created_at).toLocaleString("en-US")}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => handleEditNote(note)}
+                          className="w-fit rounded-full border border-white/20 px-4 py-2 text-xs text-white transition hover:border-white/60"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() =>
+                            deleteProjectNote(note.id).then(() =>
+                              loadNotes(selectedProject?.id)
+                            )
+                          }
+                          className="w-fit rounded-full border border-rose-400/50 px-4 py-2 text-xs text-rose-200 transition hover:border-rose-300"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                    {note.changed_files && (
+                      <p className="mt-3 text-xs text-white/50">
+                        Files changed: {note.changed_files}
+                      </p>
+                    )}
+                    {note.content && (
+                      <div className="mt-3 project-note-markdown">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {formatNoteContent(note.content)}
+                        </ReactMarkdown>
+                      </div>
+                    )}
+                    {photoItems.length > 0 && (
+                      <div className="mt-3 space-y-3">
+                        {photoItems.map((photo, index) => (
+                          <div key={`${note.id}-photo-${index}`} className="space-y-2">
+                            {photo.url && (
+                              <div className="h-24 w-24 overflow-hidden rounded-2xl border border-white/10">
+                                <img
+                                  src={photo.url}
+                                  alt="Project note"
+                                  className="h-full w-full object-cover"
+                                  onClick={() => setPreviewUrl(photo.url)}
+                                />
+                              </div>
+                            )}
+                            {photo.description && (
+                              <p className="text-xs text-white/60">{photo.description}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {note.important && (
+                      <span className="mt-3 inline-flex rounded-full bg-rose-500/20 px-3 py-1 text-xs text-rose-200">
+                        Important
+                      </span>
+                    )}
+                  </>
+                )}
               </div>
             );
           })}
