@@ -24,6 +24,9 @@ const formatCategory = (value) => {
     .join(" ");
 };
 
+
+const EXPENSES_PASSWORD = "SANIKA2004"; // Change this to your desired password
+
 const Expenses = ({ refreshKey = 0 }) => {
   const [form, setForm] = useState({
     amount: "",
@@ -34,6 +37,9 @@ const Expenses = ({ refreshKey = 0 }) => {
   const [expenses, setExpenses] = useState([]);
   const [error, setError] = useState("");
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+  const [password, setPassword] = useState("");
+  const [authenticated, setAuthenticated] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
   const categoryMenuRef = useRef(null);
 
   const loadExpenses = async () => {
@@ -45,9 +51,13 @@ const Expenses = ({ refreshKey = 0 }) => {
     setExpenses(data || []);
   };
 
+
   useEffect(() => {
-    loadExpenses();
-  }, [refreshKey]);
+    if (authenticated) {
+      loadExpenses();
+    }
+    // eslint-disable-next-line
+  }, [refreshKey, authenticated]);
 
   useEffect(() => {
     const handleOutsideClick = (event) => {
@@ -99,6 +109,39 @@ const Expenses = ({ refreshKey = 0 }) => {
   }, [expenses]);
 
   const todayTotal = totalsByDate[todayString()] || 0;
+
+
+  if (!authenticated) {
+    return (
+      <section className="card space-y-6 p-6 md:p-8 animate-floatIn flex flex-col items-center justify-center min-h-[300px]">
+        <h2 className="section-title mb-4">Enter Password to Access Expenses</h2>
+        <form
+          onSubmit={e => {
+            e.preventDefault();
+            if (password === EXPENSES_PASSWORD) {
+              setAuthenticated(true);
+              setPasswordError("");
+            } else {
+              setPasswordError("Incorrect password. Try again.");
+            }
+          }}
+          className="flex flex-col gap-4 w-full max-w-xs"
+        >
+          <input
+            type="password"
+            className="rounded-2xl bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-ocean"
+            placeholder="Password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+          />
+          <button className="rounded-2xl bg-mint px-5 py-3 text-sm font-semibold text-ink shadow-glow transition hover:brightness-110">
+            Unlock
+          </button>
+          {passwordError && <p className="text-sm text-rose-300">{passwordError}</p>}
+        </form>
+      </section>
+    );
+  }
 
   return (
     <section className="card space-y-6 p-6 md:p-8 animate-floatIn">

@@ -23,6 +23,33 @@ const ProjectNotes = () => {
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
   const [notes, setNotes] = useState([]);
+  const [deletedNotes, setDeletedNotes] = useState([]); // Recycle bin state
+  const [showRecycleBin, setShowRecycleBin] = useState(false);
+    // Move note to recycle bin instead of deleting permanently
+    const handleDeleteProjectNote = (noteId) => {
+      const noteToDelete = notes.find((n) => n.id === noteId);
+      if (noteToDelete) {
+        setDeletedNotes((prev) => [...prev, { ...noteToDelete, deletedAt: new Date().toISOString() }]);
+        setNotes((prev) => prev.filter((n) => n.id !== noteId));
+      }
+      // Optionally, call deleteProjectNote(noteId) for permanent delete
+      // deleteProjectNote(noteId);
+    };
+
+    // Restore note from recycle bin
+    const handleRestore = (noteId) => {
+      const noteToRestore = deletedNotes.find((n) => n.id === noteId);
+      if (noteToRestore) {
+        setNotes((prev) => [...prev, noteToRestore]);
+        setDeletedNotes((prev) => prev.filter((n) => n.id !== noteId));
+      }
+    };
+
+    // Permanently delete note from recycle bin
+    const handlePermanentDelete = (noteId) => {
+      setDeletedNotes((prev) => prev.filter((n) => n.id !== noteId));
+      // Optionally, call deleteProjectNote(noteId) here for backend
+    };
   const [projectName, setProjectName] = useState("");
   const [noteForm, setNoteForm] = useState({
     title: "",
@@ -498,6 +525,12 @@ const ProjectNotes = () => {
           </div>
           <div className="flex flex-wrap gap-2">
             <button
+              className="rounded-full border border-gray-400/50 px-4 py-2 text-xs text-gray-700 bg-white hover:bg-gray-100 transition ml-2"
+              onClick={() => setShowRecycleBin(true)}
+            >
+              🗑️ Recycle Bin ({deletedNotes.length})
+            </button>
+            <button
               className={`rounded-full px-4 py-2 text-xs transition ${
                 filterToday ? "bg-white text-ink" : "bg-white/10 text-white"
               }`}
@@ -810,15 +843,47 @@ const ProjectNotes = () => {
                           Edit
                         </button>
                         <button
-                          onClick={() =>
-                            deleteProjectNote(note.id).then(() =>
-                              loadNotes(selectedProject?.id)
-                            )
-                          }
+                          onClick={() => handleDeleteProjectNote(note.id)}
                           className="w-fit rounded-full border border-rose-400/50 px-4 py-2 text-xs text-rose-200 transition hover:border-rose-300"
                         >
                           Delete
                         </button>
+                            {/* Recycle Bin Modal */}
+                            {showRecycleBin && (
+                              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                                <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
+                                  <h3 className="text-lg font-bold mb-4">Recycle Bin</h3>
+                                  {deletedNotes.length === 0 ? (
+                                    <p className="text-gray-500">No deleted notes.</p>
+                                  ) : (
+                                    <ul className="space-y-3 max-h-64 overflow-y-auto">
+                                      {deletedNotes.map((note) => (
+                                        <li key={note.id} className="flex items-center justify-between border-b pb-2">
+                                          <div>
+                                            <div className="font-semibold">{note.title || 'Untitled'}</div>
+                                            <div className="text-xs text-gray-400">Deleted: {toDateKey(note.deletedAt)}</div>
+                                          </div>
+                                          <div className="flex gap-2">
+                                            <button
+                                              className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
+                                              onClick={() => handleRestore(note.id)}
+                                            >Restore</button>
+                                            <button
+                                              className="px-2 py-1 text-xs bg-rose-100 text-rose-700 rounded hover:bg-rose-200"
+                                              onClick={() => handlePermanentDelete(note.id)}
+                                            >Delete</button>
+                                          </div>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                  <button
+                                    className="mt-4 w-full rounded bg-gray-200 py-2 text-gray-700 hover:bg-gray-300"
+                                    onClick={() => setShowRecycleBin(false)}
+                                  >Close</button>
+                                </div>
+                              </div>
+                            )}
                       </div>
                     </div>
                     {note.changed_files && (

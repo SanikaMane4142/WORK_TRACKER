@@ -1,3 +1,23 @@
+// Diary (for DailyDiary component)
+export const fetchDiaryEntry = async (date) => {
+  if (!date) return { data: null, error: { message: "No date provided" } };
+  const { data, error } = await supabase
+    .from("diary_entries")
+    .select("*")
+    .eq("entry_date", date)
+    .maybeSingle();
+  return { data, error };
+};
+
+export const upsertDiaryEntry = async ({ entry_date, text }) => {
+  if (!entry_date) return { data: null, error: { message: "No date provided" } };
+  const { data, error } = await supabase
+    .from("diary_entries")
+    .upsert([{ entry_date, text }], { onConflict: "entry_date" })
+    .select()
+    .maybeSingle();
+  return { data, error };
+};
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;

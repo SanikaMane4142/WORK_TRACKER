@@ -1,6 +1,7 @@
 import React from "react";
 import TaskList from "./TaskList.jsx";
 import WorkLog from "./WorkLog.jsx";
+import DailyDiary from "./DailyDiary.jsx";
 import MistakeLog from "./MistakeLog.jsx";
 import InsightTracker from "./InsightTracker.jsx";
 import NotesBoard from "./NotesBoard.jsx";
@@ -1256,6 +1257,7 @@ const Dashboard = ({
           </div>
         </div>
         <div className="space-y-6">
+          <DailyDiary date={selectedDate} />
           <div className="rounded-2xl border border-slate-200 bg-white/80 p-6 shadow-card">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
