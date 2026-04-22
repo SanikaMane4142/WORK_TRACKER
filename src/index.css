@@ -57,8 +57,30 @@ textarea::placeholder {
 input.bg-white\/10,
 textarea.bg-white\/10,
 select.bg-white\/10 {
-  background-color: rgba(226, 232, 240, 0.72);
-  border: 1px solid rgba(148, 163, 184, 0.32);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.95), rgba(226, 232, 240, 0.78));
+  border: 1px solid rgba(148, 163, 184, 0.38);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 12px 26px rgba(15, 23, 42, 0.06);
+}
+
+input.bg-white\/10:hover,
+textarea.bg-white\/10:hover,
+select.bg-white\/10:hover {
+  border-color: rgba(148, 163, 184, 0.55);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 16px 32px rgba(15, 23, 42, 0.08);
+}
+
+input.bg-white\/10:focus,
+textarea.bg-white\/10:focus,
+select.bg-white\/10:focus {
+  border-color: rgba(139, 92, 246, 0.6);
+  box-shadow:
+    0 0 0 4px rgba(139, 92, 246, 0.16),
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 18px 40px rgba(15, 23, 42, 0.1);
 }
 
 @layer base {

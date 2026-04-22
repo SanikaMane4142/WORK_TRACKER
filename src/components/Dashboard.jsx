@@ -716,6 +716,20 @@ const Dashboard = ({
     () => new Set((logs || []).map((log) => log.log_date)),
     [logs]
   );
+  const selectedDayTasks = React.useMemo(
+    () => (tasks || []).filter((task) => task.date === selectedDate),
+    [tasks, selectedDate]
+  );
+  const selectedDayTaskCounts = React.useMemo(() => {
+    const total = selectedDayTasks.length;
+    const done = selectedDayTasks.filter((task) => task.status === "done").length;
+    const priority = selectedDayTasks.filter((task) => Boolean(task.priority)).length;
+    return { total, done, open: total - done, priority };
+  }, [selectedDayTasks]);
+  const selectedDayLog = React.useMemo(
+    () => (logs || []).find((log) => log.log_date === selectedDate),
+    [logs, selectedDate]
+  );
 
   const formatDate = (date) => date.toISOString().split("T")[0];
   const isSameDay = (a, b) => formatDate(a) === formatDate(b);
@@ -1193,67 +1207,112 @@ const Dashboard = ({
   const renderCalendar = () => (
     <section className="space-y-6">
       <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
-        <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-slate-700">Calendar</p>
-              <p className="text-xs text-slate-400">{monthLabel}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() =>
-                  setCalendarMonth(
-                    new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1)
-                  )
-                }
-                className="h-8 w-8 rounded-full border border-slate-200 text-slate-400 transition hover:bg-slate-50"
-              >
-                &lt;
-              </button>
-              <button
-                onClick={() =>
-                  setCalendarMonth(
-                    new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1)
-                  )
-                }
-                className="h-8 w-8 rounded-full border border-slate-200 text-slate-400 transition hover:bg-slate-50"
-              >
-                &gt;
-              </button>
-            </div>
-          </div>
-          <div className="mt-4 grid grid-cols-7 gap-2 text-center text-xs text-slate-400">
-            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
-              <span key={day}>{day}</span>
-            ))}
-          </div>
-          <div className="mt-3 grid grid-cols-7 gap-2">
-            {calendarDays.map(({ date, inMonth }) => {
-              const dateKey = formatDate(date);
-              const isSelected = dateKey === selectedDate;
-              const hasLog = logDateSet.has(dateKey);
-              return (
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-card">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-700">Calendar</p>
+                <p className="text-xs text-slate-400">{monthLabel}</p>
+              </div>
+              <div className="flex items-center gap-2">
                 <button
-                  key={dateKey}
-                  onClick={() => setSelectedDate(dateKey)}
-                  className={`relative flex h-10 w-10 items-center justify-center rounded-full text-sm font-medium transition ${
-                    isSelected
-                      ? "bg-indigo-500 text-white shadow-glow"
-                      : inMonth
-                      ? "text-slate-600 hover:bg-slate-100"
-                      : "text-slate-300"
-                  } ${isSameDay(date, today) && !isSelected ? "border border-indigo-200" : ""}`}
+                  onClick={() =>
+                    setCalendarMonth(
+                      new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1)
+                    )
+                  }
+                  className="h-8 w-8 rounded-full border border-slate-200 text-slate-400 transition hover:bg-slate-50"
                 >
-                  {date.getDate()}
-                  {hasLog && (
-                    <span className="absolute -bottom-1 h-2 w-2 rounded-full bg-indigo-400" />
-                  )}
+                  &lt;
                 </button>
-              );
-            })}
+                <button
+                  onClick={() =>
+                    setCalendarMonth(
+                      new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1)
+                    )
+                  }
+                  className="h-8 w-8 rounded-full border border-slate-200 text-slate-400 transition hover:bg-slate-50"
+                >
+                  &gt;
+                </button>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-7 gap-2 text-center text-xs text-slate-400">
+              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
+                <span key={day}>{day}</span>
+              ))}
+            </div>
+            <div className="mt-3 grid grid-cols-7 gap-2">
+              {calendarDays.map(({ date, inMonth }) => {
+                const dateKey = formatDate(date);
+                const isSelected = dateKey === selectedDate;
+                const hasLog = logDateSet.has(dateKey);
+                return (
+                  <button
+                    key={dateKey}
+                    onClick={() => setSelectedDate(dateKey)}
+                    className={`relative flex h-10 w-10 items-center justify-center rounded-full text-sm font-medium transition ${
+                      isSelected
+                        ? "bg-indigo-500 text-white shadow-glow"
+                        : inMonth
+                        ? "text-slate-600 hover:bg-slate-100"
+                        : "text-slate-300"
+                    } ${isSameDay(date, today) && !isSelected ? "border border-indigo-200" : ""}`}
+                  >
+                    {date.getDate()}
+                    {hasLog && (
+                      <span className="absolute -bottom-1 h-2 w-2 rounded-full bg-indigo-400" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
-            Selected: <span className="font-semibold text-slate-700">{selectedDate}</span>
+
+          <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-card">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-700">Day snapshot</p>
+                <p className="text-xs text-slate-400">{selectedDate}</p>
+              </div>
+              <div className="flex flex-wrap justify-end gap-2">
+                <button
+                  onClick={() => setSelectedDate(formatDate(today))}
+                  className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+                >
+                  Today
+                </button>
+                <button
+                  onClick={() => setSelectedDate(yesterday)}
+                  className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+                >
+                  Yesterday
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-semibold text-slate-500">Tasks</p>
+                <p className="mt-1 text-2xl font-semibold text-slate-800">
+                  {selectedDayTaskCounts.done}/{selectedDayTaskCounts.total}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {selectedDayTaskCounts.open} open · {selectedDayTaskCounts.priority} priority
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-semibold text-slate-500">Work log</p>
+                <p className="mt-1 text-2xl font-semibold text-slate-800">
+                  {selectedDayLog?.hours ?? "-"}
+                  <span className="ml-1 text-sm font-semibold text-slate-500">hrs</span>
+                </p>
+                <p className="text-xs text-slate-500">
+                  Rating {selectedDayLog?.rating ?? "-"} · {selectedDayLog ? "Saved" : "Not saved"}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
         <div className="space-y-6">

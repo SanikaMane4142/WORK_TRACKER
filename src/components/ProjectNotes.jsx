@@ -400,69 +400,127 @@ const ProjectNotes = () => {
     if (!content) return "";
     if (content.includes("|")) return content;
     const lines = content.split(/\r?\n/);
-    const hasMarker = lines.some((line) => line.trim().toUpperCase() === "TABLE");
+    const isMarker = (line) => line.trim().toUpperCase() === "TABLE";
+    const hasMarker = lines.some(isMarker);
     if (!hasMarker) return content;
-    const output = [];
-    let i = 0;
+
+    const splitByTabs = (value) =>
+      value
+        .split("\t")
+        .map((cell) => cell.trim())
+        .filter(Boolean);
+
     const splitBySpaces = (value) =>
       value
         .trim()
         .split(/\s{2,}/)
         .map((cell) => cell.trim())
         .filter(Boolean);
-    let convertNextBlock = false;
+
+    const parseCells = (line) => {
+      if (!line) return [];
+      if (line.includes("\t")) return splitByTabs(line);
+      const spaceCells = splitBySpaces(line);
+      return spaceCells.length >= 2 ? spaceCells : [];
+    };
+
+    const escapeCell = (value) => String(value ?? "").replace(/\|/g, "\\|");
+
+    const renderTable = (headerCells, rows) => {
+      const header = (headerCells || []).filter(Boolean);
+      const normalizedHeader = header.length ? header : ["File", "Purpose / Role"];
+      const columnCount = Math.max(2, normalizedHeader.length);
+      const separator = Array.from({ length: columnCount }, () => "---");
+      const tableLines = [];
+
+      tableLines.push(`| ${normalizedHeader.map(escapeCell).join(" | ")} |`);
+      tableLines.push(`| ${separator.join(" | ")} |`);
+
+      rows.forEach((row) => {
+        const padded = Array.from({ length: columnCount }, (_, idx) =>
+          escapeCell(row?.[idx] ?? "")
+        );
+        tableLines.push(`| ${padded.join(" | ")} |`);
+      });
+
+      return tableLines;
+    };
+
+    const convertRegionToMarkdown = (regionLines) => {
+      const trimmed = [...regionLines];
+      while (trimmed.length && trimmed[0].trim() === "") trimmed.shift();
+      while (trimmed.length && trimmed[trimmed.length - 1].trim() === "") trimmed.pop();
+      if (!trimmed.length) return [];
+
+      // Optional title line (e.g. "The Bridge to AI (Python)") before header.
+      const headerIndex = trimmed.findIndex((line) => parseCells(line).length >= 2);
+      if (headerIndex === -1) return trimmed;
+
+      const out = [];
+      const titleLines = trimmed.slice(0, headerIndex).filter((line) => line.trim() !== "");
+      if (titleLines.length) {
+        out.push(...titleLines);
+        out.push("");
+      }
+
+      const headerCells = parseCells(trimmed[headerIndex]);
+      const rows = [];
+      let j = headerIndex + 1;
+
+      while (j < trimmed.length) {
+        while (j < trimmed.length && trimmed[j].trim() === "") j += 1;
+        if (j >= trimmed.length) break;
+
+        const line = trimmed[j];
+        const rowCells = parseCells(line);
+        if (rowCells.length >= 2) {
+          rows.push(rowCells);
+          j += 1;
+          continue;
+        }
+
+        // Two-line (or multi-line) rows: file on one line, description on following lines.
+        const file = line.trim();
+        j += 1;
+        const descLines = [];
+        while (j < trimmed.length && trimmed[j].trim() !== "") {
+          if (parseCells(trimmed[j]).length >= 2) break;
+          descLines.push(trimmed[j].trim());
+          j += 1;
+        }
+
+        const description = descLines.length ? descLines.join("<br />") : "";
+        rows.push([file, description]);
+      }
+
+      out.push(...renderTable(headerCells, rows));
+      return out;
+    };
+
+    const output = [];
+    let i = 0;
+
     while (i < lines.length) {
-      const line = lines[i];
-      if (line?.trim().toUpperCase() === "TABLE") {
-        convertNextBlock = true;
+      if (!isMarker(lines[i])) {
+        output.push(lines[i]);
         i += 1;
         continue;
       }
-      const hasTabs = line?.includes("\t");
-      const spaceCells = line ? splitBySpaces(line) : [];
-      const hasSpaceTable = spaceCells.length >= 2;
-      if (!line || (!convertNextBlock && (!hasTabs && !hasSpaceTable))) {
-        output.push(line);
-        i += 1;
-        continue;
-      }
-      if (!convertNextBlock) {
-        output.push(line);
-        i += 1;
-        continue;
-      }
-      const block = [];
-      while (
-        i < lines.length &&
-        lines[i] &&
-        (lines[i].includes("\t") || splitBySpaces(lines[i]).length >= 2)
-      ) {
-        block.push(lines[i]);
+
+      i += 1; // skip marker
+      const region = [];
+      while (i < lines.length && !isMarker(lines[i])) {
+        region.push(lines[i]);
         i += 1;
       }
-      if (block.length >= 2) {
-        const headerCells = block[0].includes("\t")
-          ? block[0].split("\t").map((cell) => cell.trim())
-          : splitBySpaces(block[0]);
-        const separator = headerCells.map(() => "---");
-        output.push(`| ${headerCells.join(" | ")} |`);
-        output.push(`| ${separator.join(" | ")} |`);
-        block.slice(1).forEach((row) => {
-          const cells = row.includes("\t")
-            ? row.split("\t").map((cell) => cell.trim())
-            : splitBySpaces(row);
-          output.push(`| ${cells.join(" | ")} |`);
-        });
-        convertNextBlock = false;
-      } else {
-        output.push(...block);
-        convertNextBlock = false;
-      }
-      if (i < lines.length && lines[i] === "") {
+
+      output.push(...convertRegionToMarkdown(region));
+      if (i < lines.length && output[output.length - 1] !== "") {
         output.push("");
-        i += 1;
       }
     }
+
+    while (output.length && output[output.length - 1] === "") output.pop();
     return output.join("\n");
   };
 

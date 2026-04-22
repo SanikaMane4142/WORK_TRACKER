@@ -486,8 +486,8 @@ const WorkLog = ({
         <label className="space-y-2 text-sm text-white/70">
           Tasks planned
           <textarea
-            rows="3"
-            className="w-full rounded-2xl bg-white/10 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-ocean disabled:opacity-50"
+            rows="5"
+            className="w-full resize-y rounded-2xl bg-white/10 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-ocean disabled:opacity-50"
             value={form.tasks_planned}
             onChange={handleChange("tasks_planned")}
             onPaste={handlePlainTextPaste("tasks_planned")}
@@ -497,8 +497,8 @@ const WorkLog = ({
         <label className="space-y-2 text-sm text-white/70">
           Tasks completed
           <textarea
-            rows="3"
-            className="w-full rounded-2xl bg-white/10 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-ocean disabled:opacity-50"
+            rows="5"
+            className="w-full resize-y rounded-2xl bg-white/10 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-ocean disabled:opacity-50"
             value={form.tasks_completed}
             onChange={handleChange("tasks_completed")}
             onPaste={handlePlainTextPaste("tasks_completed")}
@@ -508,8 +508,8 @@ const WorkLog = ({
         <label className="space-y-2 text-sm text-white/70">
           WIP
           <textarea
-            rows="2"
-            className="w-full rounded-2xl bg-white/10 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-ocean disabled:opacity-50"
+            rows="4"
+            className="w-full resize-y rounded-2xl bg-white/10 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-ocean disabled:opacity-50"
             value={form.wip}
             onChange={handleChange("wip")}
             onPaste={handlePlainTextPaste("wip")}
@@ -519,8 +519,8 @@ const WorkLog = ({
         <label className="space-y-2 text-sm text-white/70">
           Blockers
           <textarea
-            rows="2"
-            className="w-full rounded-2xl bg-white/10 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-ocean disabled:opacity-50"
+            rows="4"
+            className="w-full resize-y rounded-2xl bg-white/10 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-ocean disabled:opacity-50"
             value={form.blockers}
             onChange={handleChange("blockers")}
             onPaste={handlePlainTextPaste("blockers")}
@@ -530,8 +530,8 @@ const WorkLog = ({
         <label className="space-y-2 text-sm text-white/70">
           Learnings
           <textarea
-            rows="2"
-            className="w-full rounded-2xl bg-white/10 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-ocean disabled:opacity-50"
+            rows="4"
+            className="w-full resize-y rounded-2xl bg-white/10 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-ocean disabled:opacity-50"
             value={form.learnings}
             onChange={handleChange("learnings")}
             onPaste={handlePlainTextPaste("learnings")}
@@ -541,8 +541,8 @@ const WorkLog = ({
         <label className="space-y-2 text-sm text-white/70">
           Insights
           <textarea
-            rows="2"
-            className="w-full rounded-2xl bg-white/10 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-ocean disabled:opacity-50"
+            rows="4"
+            className="w-full resize-y rounded-2xl bg-white/10 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-ocean disabled:opacity-50"
             value={form.insights}
             onChange={handleChange("insights")}
             onPaste={handlePlainTextPaste("insights")}
@@ -564,8 +564,8 @@ const WorkLog = ({
         <label className="space-y-2 text-sm text-white/70">
           Tomorrow plan
           <textarea
-            rows="2"
-            className="w-full rounded-2xl bg-white/10 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-ocean disabled:opacity-50"
+            rows="4"
+            className="w-full resize-y rounded-2xl bg-white/10 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-ocean disabled:opacity-50"
             value={form.tomorrow}
             onChange={handleChange("tomorrow")}
             onPaste={handlePlainTextPaste("tomorrow")}
@@ -575,8 +575,8 @@ const WorkLog = ({
         <label className="md:col-span-2 space-y-2 text-sm text-white/70">
           Notes
           <textarea
-            rows="3"
-            className="w-full rounded-2xl bg-white/10 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-ocean disabled:opacity-50"
+            rows="6"
+            className="w-full resize-y rounded-2xl bg-white/10 px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-ocean disabled:opacity-50"
             value={form.notes}
             onChange={handleChange("notes")}
             onPaste={handlePlainTextPaste("notes")}
