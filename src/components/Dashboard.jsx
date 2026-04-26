@@ -1760,7 +1760,7 @@ const Dashboard = ({
           "--sidebar-width": `${sidebarWidth}px`,
         }}
       >
-        <div className="relative hidden md:block md:sticky md:top-8 md:self-start md:max-h-[calc(100vh-4rem)] md:overflow-auto">
+        <div className="relative hidden md:block md:sticky md:top-8 md:self-start md:max-h-[calc(100vh-4rem)] md:overflow-y-auto md:overflow-x-hidden">
           <Sidebar
             activeNav={activeNav}
             onNavigate={setActiveNav}

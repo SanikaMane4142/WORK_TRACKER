@@ -19,6 +19,51 @@ import {
 
 const toDateKey = (value) => new Date(value).toISOString().split("T")[0];
 
+const PROJECT_NAMES_HIDDEN_KEY = "work_tracker:project_names_hidden";
+const NOTE_COLLAPSED_KEY_PREFIX = "work_tracker:collapsed_notes:";
+
+const TrashIcon = ({ className }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+    aria-hidden="true"
+  >
+    <path
+      d="M9 3h6m-8 4h10M10 7v12m4-12v12M6 7l1 14h10l1-14"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const PencilIcon = ({ className }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+    aria-hidden="true"
+  >
+    <path
+      d="M12 20h9"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <path
+      d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4L16.5 3.5Z"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
 const ProjectNotes = () => {
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
@@ -63,6 +108,8 @@ const ProjectNotes = () => {
   const [filterImportant, setFilterImportant] = useState(false);
   const [error, setError] = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
+  const [areProjectNamesHidden, setAreProjectNamesHidden] = useState(false);
+  const [collapsedNoteIds, setCollapsedNoteIds] = useState(() => new Set());
   const MAX_PHOTOS = 6;
 
   const normalizePhotoUrls = (value) => {
@@ -123,8 +170,70 @@ const ProjectNotes = () => {
   }, []);
 
   useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(PROJECT_NAMES_HIDDEN_KEY);
+      if (saved === "1") setAreProjectNamesHidden(true);
+    } catch {
+      // ignore storage errors
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        PROJECT_NAMES_HIDDEN_KEY,
+        areProjectNamesHidden ? "1" : "0"
+      );
+    } catch {
+      // ignore storage errors
+    }
+  }, [areProjectNamesHidden]);
+
+  useEffect(() => {
     loadNotes(selectedProject?.id);
   }, [selectedProject?.id]);
+
+  useEffect(() => {
+    if (!selectedProject?.id) return;
+    try {
+      const saved = window.localStorage.getItem(
+        `${NOTE_COLLAPSED_KEY_PREFIX}${selectedProject.id}`
+      );
+      if (!saved) {
+        setCollapsedNoteIds(new Set());
+        return;
+      }
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        setCollapsedNoteIds(new Set(parsed.filter(Boolean)));
+      } else {
+        setCollapsedNoteIds(new Set());
+      }
+    } catch {
+      setCollapsedNoteIds(new Set());
+    }
+  }, [selectedProject?.id]);
+
+  useEffect(() => {
+    if (!selectedProject?.id) return;
+    try {
+      window.localStorage.setItem(
+        `${NOTE_COLLAPSED_KEY_PREFIX}${selectedProject.id}`,
+        JSON.stringify(Array.from(collapsedNoteIds))
+      );
+    } catch {
+      // ignore storage errors
+    }
+  }, [collapsedNoteIds, selectedProject?.id]);
+
+  const toggleNoteCollapsed = (noteId) => {
+    setCollapsedNoteIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(noteId)) next.delete(noteId);
+      else next.add(noteId);
+      return next;
+    });
+  };
 
   const handleAddProject = async (event) => {
     event.preventDefault();
@@ -525,51 +634,99 @@ const ProjectNotes = () => {
   };
 
   return (
-    <section className="grid gap-6 lg:grid-cols-[280px_1fr]">
-      <aside className="card p-5 space-y-4">
-        <div>
-          <h2 className="section-title">Projects</h2>
-          <p className="text-sm text-white/60">Open a project to see its notes.</p>
-        </div>
-        <form onSubmit={handleAddProject} className="grid gap-3">
-          <input
-            className="rounded-2xl bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-ocean"
-            placeholder="New project name"
-            value={projectName}
-            onChange={(event) => setProjectName(event.target.value)}
-          />
-          <button className="rounded-2xl bg-mint px-4 py-2 text-xs font-semibold text-ink shadow-glow transition hover:brightness-110">
-            Add project
+    <section
+      className={`grid items-start gap-6 ${
+        areProjectNamesHidden
+          ? "lg:grid-cols-[72px_1fr]"
+          : "lg:grid-cols-[280px_1fr]"
+      }`}
+    >
+      {areProjectNamesHidden ? (
+        <aside className="card self-start p-3">
+          <button
+            type="button"
+            className="flex w-full flex-col items-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-2 py-4 text-xs font-medium text-white/80 shadow-sm transition hover:border-white/35 hover:bg-white/10 hover:text-white"
+            onClick={() => setAreProjectNamesHidden(false)}
+            aria-label="Show projects"
+            title="Show projects"
+          >
+            <span className="text-lg leading-none">👁️</span>
+            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-white/70">
+              {projects.length}
+            </span>
           </button>
-        </form>
-        <div className="space-y-2">
-          {projects.length === 0 && (
-            <p className="text-sm text-white/60">No projects yet.</p>
-          )}
-          {projects.map((project) => (
-            <button
-              key={project.id}
-              onClick={() => setSelectedProject(project)}
-              className={`flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-sm transition ${
-                selectedProject?.id === project.id
-                  ? "bg-white text-ink"
-                  : "bg-white/10 text-white hover:bg-white/20"
-              }`}
-            >
-              <span className="font-medium">{project.name}</span>
-              <span
-                className="text-xs text-white/60"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  handleDeleteProject(project.id);
-                }}
-              >
-                Delete
-              </span>
+        </aside>
+      ) : (
+        <aside className="card self-start p-5 space-y-4">
+          <div>
+            <h2 className="section-title">Projects</h2>
+            <p className="text-sm text-white/60">
+              Open a project to see its notes.
+            </p>
+          </div>
+
+          <form onSubmit={handleAddProject} className="grid gap-3">
+            <input
+              className="rounded-2xl bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-ocean"
+              placeholder="New project name"
+              value={projectName}
+              onChange={(event) => setProjectName(event.target.value)}
+            />
+            <button className="rounded-2xl bg-mint px-4 py-2 text-xs font-semibold text-ink shadow-glow transition hover:brightness-110">
+              Add project
             </button>
-          ))}
-        </div>
-      </aside>
+          </form>
+
+          <button
+            type="button"
+            className="w-full rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-medium text-white/80 shadow-sm transition hover:border-white/35 hover:bg-white/10 hover:text-white"
+            onClick={() => setAreProjectNamesHidden(true)}
+            aria-label="Hide projects"
+            title="Hide projects"
+          >
+            🙈 Hide projects
+          </button>
+
+          <div className="space-y-1">
+            {projects.length === 0 && (
+              <p className="text-sm text-white/60">No projects yet.</p>
+            )}
+            {projects.map((project) => (
+              <button
+                key={project.id}
+                onClick={() => setSelectedProject(project)}
+                className={`group flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs transition ${
+                  selectedProject?.id === project.id
+                    ? "bg-white text-ink"
+                    : "bg-white/10 text-white hover:bg-white/20"
+                }`}
+              >
+                <span
+                  className="min-w-0 flex-1 truncate font-medium"
+                  title={project.name}
+                >
+                  {project.name}
+                </span>
+                <button
+                  type="button"
+                  className={`shrink-0 rounded-full border px-2 py-1 text-[10px] transition ${
+                    selectedProject?.id === project.id
+                      ? "border-ink/20 text-ink/70 hover:border-ink/40 hover:text-ink"
+                      : "border-white/20 text-white/60 hover:border-white/50 hover:text-white"
+                  }`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleDeleteProject(project.id);
+                  }}
+                  aria-label={`Delete project ${project.name}`}
+                >
+                  <TrashIcon className="h-4 w-4" />
+                </button>
+              </button>
+            ))}
+          </div>
+        </aside>
+      )}
 
       <div className="card p-6 md:p-8 space-y-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -586,7 +743,10 @@ const ProjectNotes = () => {
               className="rounded-full border border-gray-400/50 px-4 py-2 text-xs text-gray-700 bg-white hover:bg-gray-100 transition ml-2"
               onClick={() => setShowRecycleBin(true)}
             >
-              🗑️ Recycle Bin ({deletedNotes.length})
+              <span className="inline-flex items-center gap-2">
+                <TrashIcon className="h-4 w-4" />
+                Recycle Bin ({deletedNotes.length})
+              </span>
             </button>
             <button
               className={`rounded-full px-4 py-2 text-xs transition ${
@@ -746,6 +906,7 @@ const ProjectNotes = () => {
           {filteredNotes.map((note) => {
             const photoItems = normalizePhotoItems(note);
             const isEditing = editingNoteId === note.id;
+            const isCollapsed = collapsedNoteIds.has(note.id);
             return (
               <div
                 key={note.id}
@@ -895,16 +1056,31 @@ const ProjectNotes = () => {
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <button
-                          onClick={() => handleEditNote(note)}
-                          className="w-fit rounded-full border border-white/20 px-4 py-2 text-xs text-white transition hover:border-white/60"
+                          type="button"
+                          onClick={() => toggleNoteCollapsed(note.id)}
+                          className="w-fit rounded-full border border-white/20 px-3 py-2 text-base font-semibold leading-none text-white transition hover:border-white/60"
+                          aria-label={isCollapsed ? "Expand note" : "Minimize note"}
+                          title={isCollapsed ? "Expand note" : "Minimize note"}
                         >
-                          Edit
+                          {isCollapsed ? "+" : "−"}
                         </button>
                         <button
-                          onClick={() => handleDeleteProjectNote(note.id)}
-                          className="w-fit rounded-full border border-rose-400/50 px-4 py-2 text-xs text-rose-200 transition hover:border-rose-300"
+                          type="button"
+                          onClick={() => handleEditNote(note)}
+                          className="w-fit rounded-full border border-white/20 px-3 py-2 text-xs text-white transition hover:border-white/60"
+                          aria-label="Edit note"
+                          title="Edit note"
                         >
-                          Delete
+                          <PencilIcon className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteProjectNote(note.id)}
+                          className="w-fit rounded-full border border-rose-400/50 px-3 py-2 text-xs text-rose-200 transition hover:border-rose-300"
+                          aria-label="Delete note"
+                          title="Delete note"
+                        >
+                          <TrashIcon className="h-4 w-4" />
                         </button>
                             {/* Recycle Bin Modal */}
                             {showRecycleBin && (
@@ -944,38 +1120,48 @@ const ProjectNotes = () => {
                             )}
                       </div>
                     </div>
-                    {note.changed_files && (
-                      <p className="mt-3 text-xs text-white/50">
-                        Files changed: {note.changed_files}
-                      </p>
-                    )}
-                    {note.content && (
-                      <div className="mt-3 project-note-markdown">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {formatNoteContent(note.content)}
-                        </ReactMarkdown>
-                      </div>
-                    )}
-                    {photoItems.length > 0 && (
-                      <div className="mt-3 space-y-3">
-                        {photoItems.map((photo, index) => (
-                          <div key={`${note.id}-photo-${index}`} className="space-y-2">
-                            {photo.url && (
-                              <div className="h-24 w-24 overflow-hidden rounded-2xl border border-white/10">
-                                <img
-                                  src={photo.url}
-                                  alt="Project note"
-                                  className="h-full w-full object-cover"
-                                  onClick={() => setPreviewUrl(photo.url)}
-                                />
-                              </div>
-                            )}
-                            {photo.description && (
-                              <p className="text-xs text-white/60">{photo.description}</p>
-                            )}
+
+                    {!isCollapsed && (
+                      <>
+                        {note.changed_files && (
+                          <p className="mt-3 text-xs text-white/50">
+                            Files changed: {note.changed_files}
+                          </p>
+                        )}
+                        {note.content && (
+                          <div className="mt-3 project-note-markdown">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {formatNoteContent(note.content)}
+                            </ReactMarkdown>
                           </div>
-                        ))}
-                      </div>
+                        )}
+                        {photoItems.length > 0 && (
+                          <div className="mt-3 space-y-3">
+                            {photoItems.map((photo, index) => (
+                              <div
+                                key={`${note.id}-photo-${index}`}
+                                className="space-y-2"
+                              >
+                                {photo.url && (
+                                  <div className="h-24 w-24 overflow-hidden rounded-2xl border border-white/10">
+                                    <img
+                                      src={photo.url}
+                                      alt="Project note"
+                                      className="h-full w-full object-cover"
+                                      onClick={() => setPreviewUrl(photo.url)}
+                                    />
+                                  </div>
+                                )}
+                                {photo.description && (
+                                  <p className="text-xs text-white/60">
+                                    {photo.description}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
                     )}
                     {note.important && (
                       <span className="mt-3 inline-flex rounded-full bg-rose-500/20 px-3 py-1 text-xs text-rose-200">
